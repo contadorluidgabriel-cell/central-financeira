@@ -1,6 +1,6 @@
 {
   "name": "central-financeira",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@neondatabase/neon-js": "0.7.0-beta",
     "next": "^15.2.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
