@@ -1,5 +1,5 @@
-import CentralFinanceiraApp from '../components/CentralFinanceiraApp';
+import CentralFinanceiraLive from '../components/CentralFinanceiraLive';
 
 export default function Page() {
-  return <CentralFinanceiraApp />;
+  return <CentralFinanceiraLive />;
 }
