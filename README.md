@@ -15,6 +15,7 @@ Plataforma de acompanhamento financeiro para clientes do escritório Contador Lu
 - Neon Auth + Data API ativos em ambiente isolado de teste
 - RLS multiempresa em validação
 - CI de build no GitHub Actions
+- Projeto conectado à Vercel para validação do `/neon-test`
 
 ## Estrutura
 
@@ -71,7 +72,7 @@ npm run build
 3. Testar duas organizações e confirmar isolamento entre tenants
 4. Integrar o painel principal à camada Neon
 5. Remover `localStorage`
-6. Publicar preview na Vercel
+6. Validar o deployment da Vercel com as variáveis públicas do Neon configuradas
 
 ## Segurança
 
