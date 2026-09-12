@@ -1,5 +1,5 @@
-import CentralFinanceiraV11 from '../components/CentralFinanceiraV11';
+import CentralFinanceiraV2 from '../components/CentralFinanceiraV2';
 
 export default function Page() {
-  return <CentralFinanceiraV11 />;
+  return <CentralFinanceiraV2 />;
 }
