@@ -11,7 +11,9 @@ Plataforma de acompanhamento financeiro para clientes do escritório Contador Lu
 - Confirmação de competência
 - Categorias padrão e personalizadas por empresa
 - Fechamento e bloqueio por competência
-- Persistência local temporária
+- Persistência local ainda mantida no painel principal
+- Neon Auth + Data API ativos em ambiente isolado de teste
+- RLS multiempresa em validação
 - CI de build no GitHub Actions
 
 ## Estrutura
@@ -21,20 +23,40 @@ app/
   globals.css
   layout.jsx
   page.jsx
+  neon-test/
+    page.jsx
 components/
   CentralFinanceiraApp.jsx
+  NeonTestPanel.jsx
 lib/
   demo-data.js
-legacy/
-  (protótipo estático mantido temporariamente na raiz atual)
+  neon-test-client.js
 ```
 
 ## Rodar localmente
 
 ```bash
 npm install
+cp .env.example .env.local
 npm run dev
 ```
+
+Painel atual: `http://localhost:3000`
+
+Laboratório Neon: `http://localhost:3000/neon-test`
+
+## Neon Test Lab
+
+A rota `/neon-test` usa uma branch Neon isolada para validar o backend antes de substituir a persistência local do painel principal. Ela permite testar:
+
+- cadastro e login via Neon Auth;
+- criação e troca de organização;
+- contexto de organização no JWT;
+- escrita e leitura de `financial_entries` pela Data API;
+- isolamento por RLS;
+- confirmação da competência e bloqueio posterior de lançamentos.
+
+Use somente informações fictícias nesse ambiente.
 
 ## Build
 
@@ -44,12 +66,13 @@ npm run build
 
 ## Próxima etapa
 
-1. Integrar Supabase Auth
-2. Criar schema PostgreSQL multiempresa
-3. Implementar RLS por organização
-4. Substituir `localStorage` por camada de dados real
-5. Publicar preview na Vercel
+1. Validar o fluxo completo no `/neon-test`
+2. Promover o usuário Master de teste na tabela `app_users`
+3. Testar duas organizações e confirmar isolamento entre tenants
+4. Integrar o painel principal à camada Neon
+5. Remover `localStorage`
+6. Publicar preview na Vercel
 
 ## Segurança
 
-A versão atual ainda é demonstração. Não utilizar dados reais de clientes até a autenticação, RLS e persistência no Supabase estarem concluídas.
+O painel principal ainda é demonstração. Não utilizar dados reais de clientes até que o fluxo Neon esteja validado, o `localStorage` seja removido e as políticas RLS definitivas sejam promovidas para `production`.
