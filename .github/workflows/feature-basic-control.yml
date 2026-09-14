@@ -21,10 +21,17 @@ jobs:
           node-version: 22
       - name: Apply Basic integration
         run: |
-          if ! grep -q "BASIC_EXPENSE_MODES, updateBasicSettings" components/SimpleControlAppV2.jsx; then
+          if ! grep -q "import { BASIC_EXPENSE_MODES" components/SimpleControlAppV2.jsx; then
             python scripts/apply-basic-ui-integration.py
           else
             echo "Basic UI integration already applied"
+          fi
+      - name: Apply Simple to Basic upgrade
+        run: |
+          if ! grep -q "onUpgradeBasic" components/SimpleControlAppV2.jsx; then
+            python scripts/apply-simple-basic-upgrade.py
+          else
+            echo "Simple upgrade integration already applied"
           fi
       - name: Install dependencies
         run: npm install
@@ -32,12 +39,12 @@ jobs:
         run: npm run build
       - name: Commit generated integration
         run: |
-          if git diff --quiet -- components/SimpleControlAppV2.jsx components/BasicControlAppV1.jsx components/SimpleControlApp.module.css; then
+          if git diff --quiet -- components/SimpleControlAppV2.jsx components/BasicControlAppV1.jsx components/SimpleControlApp.module.css lib/neon-simple-control.js; then
             echo "No generated changes"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add components/SimpleControlAppV2.jsx components/BasicControlAppV1.jsx components/SimpleControlApp.module.css
-          git commit -m "feat: integrar Controle Básico à experiência do cliente"
+          git add components/SimpleControlAppV2.jsx components/BasicControlAppV1.jsx components/SimpleControlApp.module.css lib/neon-simple-control.js
+          git commit -m "feat: permitir evolução do Controle Simples para Básico"
           git push origin HEAD:feat/controle-basico
