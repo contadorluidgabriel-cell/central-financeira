@@ -76,21 +76,19 @@ $$;
 
 grant execute on function public.is_financial_competency_open(uuid, date) to authenticated;
 
--- Corrige memberships antigas de client_user: uma única empresa por acesso.
+-- Client_user é single-tenant. Normaliza qualquer membership herdada/duplicada.
 delete from neon_auth.member m
 using public.app_users a
 where a.user_id = m."userId"
   and a.system_role = 'client_user'
-  and a.organization_id is not null
-  and m."organizationId" <> a.organization_id;
+  and a.organization_id is not null;
 
 insert into neon_auth.member ("organizationId", "userId", role, "createdAt")
 select a.organization_id, a.user_id, 'member', now()
 from public.app_users a
 where a.system_role = 'client_user'
   and a.active = true
-  and a.organization_id is not null
-on conflict do nothing;
+  and a.organization_id is not null;
 
 create or replace function public.register_client_access(
   p_user_id uuid,
@@ -121,18 +119,12 @@ begin
     raise exception 'Empresa não encontrada';
   end if;
 
-  -- Client_user é single-tenant: remove qualquer membership anterior.
+  -- Cliente possui exatamente uma membership.
   delete from neon_auth.member
-  where "userId" = p_user_id
-    and "organizationId" <> p_organization_id;
+  where "userId" = p_user_id;
 
   insert into neon_auth.member ("organizationId", "userId", role, "createdAt")
-  select p_organization_id, p_user_id, 'member', now()
-  where not exists (
-    select 1 from neon_auth.member
-    where "organizationId" = p_organization_id
-      and "userId" = p_user_id
-  );
+  values (p_organization_id, p_user_id, 'member', now());
 
   insert into public.app_users (
     user_id,
