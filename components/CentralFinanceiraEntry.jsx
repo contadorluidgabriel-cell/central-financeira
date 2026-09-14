@@ -44,7 +44,7 @@ function PasswordChangeGate({ email }) {
           <label style={{display:'grid',gap:6,fontSize:13,fontWeight:600}}>Senha provisória<input autoFocus type="password" value={currentPassword} onChange={e=>setCurrentPassword(e.target.value)} required style={{height:42,border:'1px solid #D0D5DD',borderRadius:10,padding:'0 12px',font:'inherit',outline:'none'}}/></label>
           <label style={{display:'grid',gap:6,fontSize:13,fontWeight:600}}>Nova senha<input type="password" minLength={8} value={newPassword} onChange={e=>setNewPassword(e.target.value)} required style={{height:42,border:'1px solid #D0D5DD',borderRadius:10,padding:'0 12px',font:'inherit',outline:'none'}}/></label>
           <label style={{display:'grid',gap:6,fontSize:13,fontWeight:600}}>Confirmar nova senha<input type="password" minLength={8} value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)} required style={{height:42,border:'1px solid #D0D5DD',borderRadius:10,padding:'0 12px',font:'inherit',outline:'none'}}/></label>
-          <button type="submit" disabled={busy} style={{height:44,border:0,borderRadius:10,background:'#2456E8',color:'#fff',fontWeight:700,fontSize:14,cursor:busy?'wait':'pointer',opacity:busy?.72:1}}>{busy ? 'Salvando…' : 'Salvar nova senha e continuar'}</button>
+          <button type="submit" disabled={busy} style={{height:44,border:0,borderRadius:10,background:'#2456E8',color:'#fff',fontWeight:700,fontSize:14,cursor:busy?'wait':'pointer',opacity:busy ? .72 : 1}}>{busy ? 'Salvando…' : 'Salvar nova senha e continuar'}</button>
         </form>
         <p style={{margin:'14px 0 0',fontSize:12,color:'#667085',lineHeight:1.5}}>A senha provisória deixa de funcionar após a troca.</p>
       </section>
