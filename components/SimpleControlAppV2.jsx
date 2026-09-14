@@ -31,6 +31,7 @@ import {
 } from '../lib/neon-simple-control';
 import styles from './SimpleControlApp.module.css';
 import SimpleRevenueImport from './SimpleRevenueImport';
+import { generateSimpleRevenuePdf } from '../lib/simple-report-pdf';
 
 const money = value => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value || 0));
 const percent = value => `${Number(value || 0).toFixed(1).replace('.', ',')}%`;
@@ -432,6 +433,8 @@ function Customers({ customers, allEntries, search, setSearch, onCreate, onEdit,
 }
 
 function Reports({ mode, company, month, entries }) {
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const [pdfError, setPdfError] = useState('');
   const months = [...new Set(entries.map(e => e.month))].sort();
   const monthly = months.map(key => ({ key, value: netBilling(entries.filter(e => e.month === key)) }));
   const current = entries.filter(e => e.month === month && e.entry_status === 'active');
@@ -463,7 +466,19 @@ function Reports({ mode, company, month, entries }) {
     XLSX.utils.book_append_sheet(workbook, sheet, 'Receitas');
     XLSX.writeFile(workbook, `receitas-${company.name.replace(/\s+/g, '-').toLowerCase()}.xlsx`);
   };
-  return <><PageHeader title="Relatórios" description="Análises proporcionais ao nível de detalhe que você registra."><button className={styles.secondaryButtonSmall} onClick={exportCsv}><Icon name="download"/>CSV</button><button className={styles.secondaryButtonSmall} onClick={exportExcel}><Icon name="download"/>Excel</button></PageHeader><div className={styles.reportGrid}><ReportCard title="Evolução mensal" rows={monthly.slice(-12).map(item => [monthName(item.key), item.value])}/>{mode === 'individual' && <><ReportCard title="Por cliente" rows={customersData.slice(0, 8)}/><ReportCard title="Por categoria" rows={categoriesData.slice(0, 8)}/><ReportCard title="Por meio de pagamento" rows={paymentData.slice(0, 8)}/></>}</div></>;
+  const exportPdf = async () => {
+    if (pdfBusy) return;
+    setPdfBusy(true);
+    setPdfError('');
+    try {
+      await generateSimpleRevenuePdf({ company, month, mode, entries });
+    } catch (error) {
+      setPdfError(error?.message || 'Não foi possível gerar o PDF.');
+    } finally {
+      setPdfBusy(false);
+    }
+  };
+  return <><PageHeader title="Relatórios" description="Análises proporcionais ao nível de detalhe que você registra."><button className={styles.primaryButtonSmall} disabled={pdfBusy} onClick={exportPdf}><Icon name="download"/>{pdfBusy ? 'Gerando PDF…' : 'PDF'}</button><button className={styles.secondaryButtonSmall} onClick={exportExcel}><Icon name="download"/>Excel</button><button className={styles.secondaryButtonSmall} onClick={exportCsv}><Icon name="download"/>CSV</button></PageHeader>{pdfError && <div className={styles.formError}>{pdfError}</div>}<div className={styles.reportGrid}><ReportCard title="Evolução mensal" rows={monthly.slice(-12).map(item => [monthName(item.key), item.value])}/>{mode === 'individual' && <><ReportCard title="Por cliente" rows={customersData.slice(0, 8)}/><ReportCard title="Por categoria" rows={categoriesData.slice(0, 8)}/><ReportCard title="Por meio de pagamento" rows={paymentData.slice(0, 8)}/></>}</div></>;
 }
 
 function ReportCard({ title, rows }) {
