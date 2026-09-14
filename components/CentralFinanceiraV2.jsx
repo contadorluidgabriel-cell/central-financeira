@@ -120,7 +120,7 @@ const MOBILE_MODULE_PRIORITY = ['receivables', 'payables', 'installments', 'recu
 const MOBILE_SHORT_LABELS = {
   overview: 'Início', transactions: 'Registros', receivables: 'Receber', payables: 'Pagar',
   installments: 'Parcelas', recurring: 'Mensais', accounts: 'Saldos', cashflow: 'Previsão',
-  budgets: 'Metas', competence: 'Revisar', reports: 'Histórico', companySettings: 'Ajustes'
+  budgets: 'Metas', competence: 'Revisar', reports: 'Histórico', companySettings: 'Cadastro'
 };
 
 const defaultCompanyDraft = () => ({ name: '', document: '', contact: '' });
@@ -524,12 +524,29 @@ export default function CentralFinanceiraV2() {
   }
 
   function CompanySettings({ c }) {
-    const profile = profileFor(c.id); const modules = modulesFor(c); const [draftModules,setDraftModules]=useState(modules); const [projection,setProjection]=useState(profile.defaultProjectionDays||30);
-    useEffect(()=>{setDraftModules(modules);setProjection(profile.defaultProjectionDays||30)},[c.id,JSON.stringify(profile.modules),c.expenseEnabled]);
-    const customRevenue = categoryRowsFor(c.id,'revenue').filter(x=>!x.is_default); const customExpense = categoryRowsFor(c.id,'expense').filter(x=>!x.is_default);
-    async function saveModules(){const payload={...draftModules,expenses:c.expenseEnabled};await run(()=>saveFinanceProfile(c.id,{modules:payload,defaultProjectionDays:projection}),'Personalização atualizada')}
-    async function addCategory(e,type){e.preventDefault();const f=new FormData(e.currentTarget),name=String(f.get('category')||'').trim();if(!name)return;await run(()=>addNeonCategory(c.id,type,name,false),'Categoria adicionada');e.currentTarget.reset()}
-    return <><PageHeader title="Personalizar Central" description="Ative somente o que faz sentido para a rotina desta empresa."><button className="btn btn-primary" onClick={saveModules} disabled={busy}>Salvar personalização</button></PageHeader><div className={styles.settingsStack}><section className={styles.settingSection}><div className={styles.settingHeader}><h3>Módulos financeiros</h3><p>Itens desativados somem da navegação do cliente.</p></div><div className={styles.settingBody}><div className={styles.moduleGrid}><div className={`${styles.moduleCard} ${styles.moduleLocked}`}><input type="checkbox" checked readOnly/><div><strong>Receitas</strong><span>Módulo essencial da Central e sempre ativo.</span></div></div><label className={styles.moduleCard}><input type="checkbox" checked={c.expenseEnabled} disabled={!isMaster} onChange={async e=>{if(!isMaster)return;await run(()=>updateOrganizationSettings(c.id,{expenseEnabled:e.target.checked}),'Acompanhamento de despesas atualizado')}}/><div><strong>Despesas</strong><span>Total, categoria ou lançamento individual.</span></div></label>{MODULE_META.map(([key,title,text])=>key==='expenses'?null:<label className={styles.moduleCard} key={key}><input type="checkbox" checked={Boolean(draftModules[key])} onChange={e=>setDraftModules(current=>({...current,[key]:e.target.checked}))}/><div><strong>{title}</strong><span>{text}</span></div></label>)}</div><div className="field" style={{maxWidth:240,marginTop:16}}><label>Horizonte da previsão</label><select className="select" value={projection} onChange={e=>setProjection(Number(e.target.value))}>{[7,15,30,60,90].map(x=><option key={x} value={x}>{x} dias</option>)}</select></div></div></section><section className={styles.settingSection}><div className={styles.settingHeader}><h3>Dados da empresa</h3><p>Identificação usada na Central.</p></div><div className={styles.settingBody}><form onSubmit={async e=>{e.preventDefault();const f=new FormData(e.currentTarget);await run(()=>updateCompanyMetadata(c,{document:String(f.get('document')||'').trim(),contact:String(f.get('contact')||'').trim()}),'Dados atualizados')}}><div className={styles.formGrid2}><div className="field"><label>CNPJ / CPF</label><input className="input" name="document" defaultValue={c.document==='Não informado'?'':c.document}/></div><div className="field"><label>E-mail principal</label><input className="input" name="contact" type="email" defaultValue={c.contact||''}/></div></div><button className="btn btn-secondary">Salvar dados</button></form></div></section><section className={styles.settingSection}><div className={styles.settingHeader}><h3>Categorias personalizadas</h3><p>Crie categorias específicas sem alterar as categorias padrão.</p></div><div className={styles.settingBody}><div className={styles.formGrid2}><div><form onSubmit={e=>addCategory(e,'revenue')}><div className="field"><label>Nova categoria de receita</label><div className="actions"><input className="input" name="category" placeholder="Ex.: Contratos"/><button className="btn btn-secondary"><Icon name="plus"/></button></div></div></form>{customRevenue.map(row=><div className="setting" key={row.id}><div><h4>{row.name}</h4></div><button className={`${styles.iconButton} ${styles.dangerButton}`} onClick={()=>run(()=>deactivateCategory(c.id,'revenue',row.name),'Categoria removida')}><Icon name="trash"/></button></div>)}</div><div><form onSubmit={e=>addCategory(e,'expense')}><div className="field"><label>Nova categoria de despesa</label><div className="actions"><input className="input" name="category" placeholder="Ex.: Equipamentos"/><button className="btn btn-secondary"><Icon name="plus"/></button></div></div></form>{customExpense.map(row=><div className="setting" key={row.id}><div><h4>{row.name}</h4></div><button className={`${styles.iconButton} ${styles.dangerButton}`} onClick={()=>run(()=>deactivateCategory(c.id,'expense',row.name),'Categoria removida')}><Icon name="trash"/></button></div>)}</div></div></div></section></div></>;
+    return <>
+      <PageHeader title="Cadastro da empresa" description="Dados cadastrais e de contato. O cliente escolhe o nível de controle e os modos de receitas e despesas no próprio acesso."/>
+      <div className={styles.settingsStack}>
+        <section className={styles.settingSection}>
+          <div className={styles.settingHeader}><h3>Dados da empresa</h3><p>Identificação usada na Central e na criação do acesso.</p></div>
+          <div className={styles.settingBody}>
+            <form onSubmit={async e=>{e.preventDefault();const f=new FormData(e.currentTarget);await run(()=>updateCompanyMetadata(c,{document:String(f.get('document')||'').trim(),contact:String(f.get('contact')||'').trim()}),'Dados atualizados')}}>
+              <div className={styles.formGrid2}>
+                <div className="field"><label>CNPJ / CPF</label><input className="input" name="document" defaultValue={c.document==='Não informado'?'':c.document}/><span className="help">Também é usado como senha provisória, somente com números, ao criar ou redefinir o acesso.</span></div>
+                <div className="field"><label>E-mail principal</label><input className="input" name="contact" type="email" defaultValue={c.contact||''}/></div>
+              </div>
+              <button className="btn btn-secondary">Salvar dados</button>
+            </form>
+          </div>
+        </section>
+        <section className={styles.settingSection}>
+          <div className={styles.settingHeader}><h3>Configuração financeira</h3><p>As escolhas de controle pertencem ao cliente.</p></div>
+          <div className={styles.settingBody}>
+            <div className={styles.modalHint}><b>Como funciona:</b> o administrador cadastra a empresa e libera o acesso. No primeiro acesso, o cliente escolhe Controle Simples ou Básico, os modos de receitas e despesas e o mês inicial. Essas opções não são definidas neste cadastro.</div>
+          </div>
+        </section>
+      </div>
+    </>;
   }
 
   function Workspace({ c }) {
@@ -557,7 +574,7 @@ export default function CentralFinanceiraV2() {
         ['reports','chart','Histórico',true]
       ] },
       { label: 'Configuração', items: [
-        ['companySettings','settings','Personalizar',true]
+        ['companySettings','settings','Cadastro da empresa',true]
       ] }
     ].map(group => ({ ...group, items: group.items.filter(item => item[3]) })).filter(group => group.items.length);
     const nav = navGroups.flatMap(group => group.items);
@@ -641,7 +658,7 @@ export default function CentralFinanceiraV2() {
 
       const createAccess = async () => {
         const result = await run(
-          ()=>createClientAccess({organizationId:c.id,email:accessDraft.email,name:c.name}),
+          ()=>createClientAccess({organizationId:c.id,email:accessDraft.email,name:c.name,document:c.document}),
           null,
           {refreshAfter:false}
         );
@@ -654,7 +671,7 @@ export default function CentralFinanceiraV2() {
 
       const resetPassword = async () => {
         const result = await run(
-          ()=>resetClientPassword({userId:access.userId,email:access.email}),
+          ()=>resetClientPassword({userId:access.userId,email:access.email,document:c.document}),
           null,
           {refreshAfter:false}
         );
@@ -689,7 +706,7 @@ export default function CentralFinanceiraV2() {
             </div>
             <button type="button" className="btn btn-primary" onClick={copyCredentials}>Copiar credenciais</button>
           </> : !access ? <>
-            <div className="field"><label>E-mail de login</label><input className="input" type="email" value={accessDraft.email} onChange={e=>setAccessDraft({email:e.target.value})} autoFocus/><span className="help">O sistema gera uma senha provisória. No primeiro login, o cliente será obrigado a criar a própria senha.</span></div>
+            <div className="field"><label>E-mail de login</label><input className="input" type="email" value={accessDraft.email} onChange={e=>setAccessDraft({email:e.target.value})} autoFocus/><span className="help">A senha provisória usa o CNPJ/CPF somente com números. Se não houver documento cadastrado, o sistema gera uma alternativa temporária. No primeiro login, o cliente será obrigado a criar a própria senha.</span></div>
           </> : <>
             <div className={styles.settlementSummary}>
               <div><span>Status</span><strong>{statusLabel}</strong></div>
