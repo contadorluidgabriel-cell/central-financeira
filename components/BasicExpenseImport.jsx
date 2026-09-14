@@ -108,16 +108,21 @@ export default function BasicExpenseImport({
 
   return <div className={styles.previewStage}>
     <div className={styles.previewHeader}>
-      <div><strong>{preview.fileName}</strong><span>{modeName(mode)} · período {month}</span></div>
+      <div><strong>{preview.fileName}</strong><span>{modeName(mode)} · período {month}{preview.sheetName ? ` · aba ${preview.sheetName}` : ''}</span></div>
       <button type="button" onClick={() => { setPreview(null); setError(''); }}>Trocar arquivo</button>
     </div>
 
     <div className={styles.summaryGrid}>
       <Summary label="Linhas" value={rows.length}/>
       <Summary label="Selecionadas" value={selectedRows.length}/>
-      <Summary label="Com aviso" value={warningRows.length} tone="warning"/>
+      <Summary label="Com aviso" value={warningRows.length + (preview.columnWarnings?.length ? 1 : 0)} tone="warning"/>
       <Summary label="Com erro" value={errorRows.length} tone={errorRows.length ? 'error' : 'default'}/>
     </div>
+
+    {preview.columnWarnings?.length > 0 && <div className={styles.catalogNotice}>
+      <strong>Confira as colunas identificadas antes de importar</strong>
+      <div>{preview.columnWarnings.map(message => <span key={message}>{message}</span>)}</div>
+    </div>}
 
     {(selectedCatalogs.newSuppliers.length || selectedCatalogs.newCategories.length || selectedCatalogs.newPayments.length) > 0 && <div className={styles.catalogNotice}>
       <strong>Novos cadastros serão criados somente ao confirmar</strong>
