@@ -1,5 +1,5 @@
-import SimpleControlApp from '../../components/SimpleControlApp';
+import SimpleControlAppV2 from '../../components/SimpleControlAppV2';
 
 export default function SimpleControlPage() {
-  return <SimpleControlApp />;
+  return <SimpleControlAppV2 />;
 }
