@@ -1,0 +1,139 @@
+name: One-time client choice fix
+
+on:
+  push:
+    paths:
+      - '.github/workflows/one-time-client-choice-fix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply product rule
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          # 1) Admin: cadastro de empresa deixa de decidir controle financeiro.
+          path = Path('components/CentralFinanceiraV2.jsx')
+          text = path.read_text()
+
+          text, n = re.subn(
+              r"const defaultCompanyDraft = \(\) => \(\{\n.*?\n\}\);",
+              "const defaultCompanyDraft = () => ({ name: '', document: '', contact: '' });",
+              text,
+              count=1,
+              flags=re.S,
+          )
+          if n != 1:
+              raise SystemExit(f'defaultCompanyDraft replacement count={n}')
+
+          company_modal = '''    if (modal.type === 'company') return <ModalShell title="Novo cliente" wide footer={<><button className="btn btn-secondary" onClick={()=>setModal(null)}>Cancelar</button><button className="btn btn-primary" disabled={busy||!companyDraft.name.trim()} onClick={async()=>{const id=await run(()=>createCompanyV2(companyDraft),null,{refreshAfter:false});if(id){await refresh(false);setModal(null);setCompanyDraft(defaultCompanyDraft());setToast('Cliente criado. A configuração financeira será escolhida no primeiro acesso.')}}}>Criar cliente</button></>}><div className={styles.formGrid2}><div className="field full"><label>Nome da empresa</label><input className="input" value={companyDraft.name} onChange={e=>setCompanyDraft(d=>({...d,name:e.target.value}))} autoFocus/></div><div className="field"><label>CNPJ / CPF</label><input className="input" value={companyDraft.document} onChange={e=>setCompanyDraft(d=>({...d,document:e.target.value}))}/></div><div className="field"><label>E-mail principal</label><input className="input" type="email" value={companyDraft.contact} onChange={e=>setCompanyDraft(d=>({...d,contact:e.target.value}))}/></div></div><div className={styles.modalHint}><b>Configuração pelo cliente:</b> você cadastra a empresa e libera o acesso. No primeiro acesso, o próprio cliente escolhe o nível de controle e como deseja acompanhar as informações.</div></ModalShell>;
+
+    if (!c) return null;'''
+
+          text, n = re.subn(
+              r"    if \(modal\.type === 'company'\) return <ModalShell title=\"Novo cliente\".*?</ModalShell>;\n\n    if \(!c\) return null;",
+              company_modal,
+              text,
+              count=1,
+              flags=re.S,
+          )
+          if n != 1:
+              raise SystemExit(f'company modal replacement count={n}')
+          path.write_text(text)
+
+          # 2) Nova empresa nasce sem nível decidido pelo contador.
+          path = Path('lib/neon-v2-data.js')
+          text = path.read_text()
+          new_create = '''export async function createCompanyV2({ name, document, contact }) {
+  const organizationId = await createBaseCompany({
+    name,
+    document,
+    contact,
+    revenueMode: 'monthly',
+    expenseEnabled: false
+  });
+
+  const settings = await neonTest.from('organization_settings').update({
+    control_tier: 'unconfigured',
+    control_start_month: null,
+    pending_revenue_mode: null,
+    pending_revenue_mode_effective: null,
+    expense_enabled: false,
+    expense_mode: 'category',
+    updated_at: new Date().toISOString()
+  }).eq('organization_id', organizationId);
+  if (settings.error) throw settings.error;
+
+  const initialModules = Object.fromEntries(
+    Object.keys(DEFAULT_FINANCE_MODULES).map(key => [key, false])
+  );
+  const profile = await neonTest.from('finance_profiles').insert({
+    organization_id: organizationId,
+    modules: initialModules,
+    dashboard_mode: 'financial',
+    default_projection_days: 30
+  });
+  if (profile.error) throw profile.error;
+  return organizationId;
+}'''
+          text, n = re.subn(
+              r"export async function createCompanyV2\(\{.*?\n\}\n\nexport async function saveFinanceProfile",
+              new_create + "\n\nexport async function saveFinanceProfile",
+              text,
+              count=1,
+              flags=re.S,
+          )
+          if n != 1:
+              raise SystemExit(f'createCompanyV2 replacement count={n}')
+          path.write_text(text)
+
+          # 3) Cliente ainda não configurado vai para o onboarding, não para a V2 completa.
+          path = Path('components/CentralFinanceiraEntry.jsx')
+          text = path.read_text()
+          old = "const useSimple = settings?.active !== false && settings?.control_tier === 'simple';"
+          new = "const useSimple = settings?.active !== false && ['unconfigured', 'simple'].includes(settings?.control_tier);"
+          if old not in text:
+              raise SystemExit('CentralFinanceiraEntry target not found')
+          path.write_text(text.replace(old, new, 1))
+
+          # 4) Onboarding deixa explícito que a escolha é do cliente.
+          path = Path('components/SimpleControlAppV2.jsx')
+          text = path.read_text()
+          old = '''<span className={styles.eyebrow}>Configuração inicial</span><h1>Como você prefere registrar seu faturamento?</h1><p>Você poderá mudar o modo depois. A alteração começa no mês seguinte para preservar o histórico.</p><div className={styles.modeGrid}>'''
+          new = '''<span className={styles.eyebrow}>Configuração da sua Central</span><h1>Como você quer controlar sua empresa?</h1><p>A configuração é sua. O contador acompanha o modelo que você escolher, mas não decide por você.</p><div className={styles.infoBox}><strong>Controle Simples</strong><span>Para quem quer acompanhar o faturamento sem precisar controlar despesas, contas a pagar, contas a receber ou caixa.</span></div><p><strong>Como você prefere registrar seu faturamento?</strong> Você poderá mudar este modo depois; a alteração passa a valer no mês seguinte para preservar o histórico.</p><div className={styles.modeGrid}>'''
+          if old not in text:
+              raise SystemExit('Onboarding target not found')
+          text = text.replace(old, new, 1)
+          text = text.replace("{busy ? 'Configurando…' : 'Começar'}</button>", "{busy ? 'Configurando…' : 'Usar Controle Simples'}</button>", 1)
+          path.write_text(text)
+
+          # Remove este workflow depois de aplicar o ajuste.
+          Path('.github/workflows/one-time-client-choice-fix.yml').unlink()
+          PY
+
+      - name: Validate build
+        run: npm ci && npm run build
+
+      - name: Commit changes
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "fix: deixar escolha de controle com o cliente"
+          git push origin HEAD:main
