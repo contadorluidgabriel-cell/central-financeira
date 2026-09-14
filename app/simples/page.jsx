@@ -1,5 +1,5 @@
-import SimpleControlAppV2 from '../../components/SimpleControlAppV2';
+import CentralFinanceiraEntry from '../../components/CentralFinanceiraEntry';
 
 export default function SimpleControlPage() {
-  return <SimpleControlAppV2 />;
+  return <CentralFinanceiraEntry />;
 }

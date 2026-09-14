@@ -52,6 +52,26 @@ function PasswordChangeGate({ email }) {
   );
 }
 
+function AccessGate({ title, message }) {
+  const [busy, setBusy] = useState(false);
+
+  async function signOut() {
+    setBusy(true);
+    try { await neonTest.auth.signOut(); } finally { window.location.reload(); }
+  }
+
+  return (
+    <main style={{minHeight:'100vh',display:'grid',placeItems:'center',padding:24,fontFamily:'Inter,system-ui,sans-serif',background:'#F6F8FC',color:'#182230'}}>
+      <section style={{width:'min(100%,460px)',background:'#fff',border:'1px solid #E4E9F1',borderRadius:18,padding:28,boxShadow:'0 18px 50px rgba(24,34,48,.08)'}}>
+        <div style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:44,height:44,borderRadius:12,background:'#EEF3FF',color:'#2456E8',fontWeight:800,marginBottom:18}}>LG</div>
+        <h1 style={{fontSize:24,lineHeight:1.2,margin:'0 0 10px'}}>{title}</h1>
+        <p style={{margin:'0 0 20px',color:'#667085',fontSize:14,lineHeight:1.55}}>{message}</p>
+        <button type="button" onClick={signOut} disabled={busy} style={{height:42,border:'1px solid #D0D5DD',borderRadius:10,background:'#fff',color:'#182230',padding:'0 16px',fontWeight:700,fontSize:14,cursor:busy?'wait':'pointer'}}>{busy ? 'Saindo…' : 'Sair'}</button>
+      </section>
+    </main>
+  );
+}
+
 export default function CentralFinanceiraEntry() {
   const session = neonTest.auth.useSession();
   const user = session.data?.user || null;
@@ -71,9 +91,19 @@ export default function CentralFinanceiraEntry() {
       try {
         const roleResult = await neonTest.from('app_users').select('system_role,active,must_change_password,organization_id').eq('user_id', user.id).limit(1);
         if (roleResult.error) throw roleResult.error;
-        const appUser = roleResult.data?.[0] || { system_role: 'client_user', active: true, must_change_password: false };
+        const appUser = roleResult.data?.[0] || null;
 
-        if (!appUser.active || appUser.system_role === 'super_admin') {
+        if (!appUser) {
+          if (!cancelled) setExperience('denied');
+          return;
+        }
+
+        if (!appUser.active) {
+          if (!cancelled) setExperience('blocked');
+          return;
+        }
+
+        if (appUser.system_role !== 'client_user') {
           if (!cancelled) setExperience('v2');
           return;
         }
@@ -86,15 +116,14 @@ export default function CentralFinanceiraEntry() {
         const orgResult = await neonTest.auth.organization.list();
         if (orgResult?.error) throw orgResult.error;
         const organizations = orgResult?.data || [];
-        const fallbackOrganizationId = appUser.organization_id || organizations[0]?.id || null;
-        const organizationId = activeOrganizationId || fallbackOrganizationId;
+        const organizationId = appUser.organization_id || null;
 
-        if (!organizationId) {
-          if (!cancelled) setExperience('v2');
+        if (!organizationId || !organizations.some(org => org.id === organizationId)) {
+          if (!cancelled) setExperience('no-company');
           return;
         }
 
-        if (!activeOrganizationId) {
+        if (activeOrganizationId !== organizationId) {
           const activate = await neonTest.auth.organization.setActive({ organizationId });
           if (activate?.error) throw activate.error;
           window.location.reload();
@@ -110,7 +139,7 @@ export default function CentralFinanceiraEntry() {
 
         const settings = settingsResult.data?.[0] || null;
         if (settings?.active === false) {
-          if (!cancelled) setExperience('v2');
+          if (!cancelled) setExperience('blocked');
           return;
         }
 
@@ -120,10 +149,10 @@ export default function CentralFinanceiraEntry() {
         if (!cancelled) {
           if (needsOnboarding || settings.control_tier === 'simple') setExperience('simple');
           else if (settings.control_tier === 'basic') setExperience('basic');
-          else setExperience('v2');
+          else setExperience('access-error');
         }
       } catch {
-        if (!cancelled) setExperience('v2');
+        if (!cancelled) setExperience('access-error');
       }
     }
 
@@ -136,6 +165,10 @@ export default function CentralFinanceiraEntry() {
   }
 
   if (experience === 'password-change') return <PasswordChangeGate email={user?.email}/>;
+  if (experience === 'denied') return <AccessGate title="Acesso não autorizado" message="Este usuário não possui acesso cadastrado na Central Financeira. Entre com o e-mail liberado pelo escritório."/>;
+  if (experience === 'blocked') return <AccessGate title="Acesso bloqueado" message="Este acesso está bloqueado. Entre em contato com o escritório para reativação."/>;
+  if (experience === 'no-company') return <AccessGate title="Empresa não vinculada" message="Seu usuário existe, mas o vínculo com a empresa não está válido. Entre em contato com o escritório."/>;
+  if (experience === 'access-error') return <AccessGate title="Não foi possível validar o acesso" message="A Central não liberou nenhuma área porque não foi possível confirmar suas permissões. Tente novamente ou entre em contato com o escritório."/>;
   if (experience === 'simple') return <SimpleControlAppV2 />;
   if (experience === 'basic') return <BasicControlAppV1 />;
   return <CentralFinanceiraV2 />;

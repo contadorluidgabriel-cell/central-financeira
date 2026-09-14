@@ -1,5 +1,5 @@
-import BasicControlAppV1 from '../../components/BasicControlAppV1';
+import CentralFinanceiraEntry from '../../components/CentralFinanceiraEntry';
 
 export default function BasicPage() {
-  return <BasicControlAppV1 />;
+  return <CentralFinanceiraEntry />;
 }
