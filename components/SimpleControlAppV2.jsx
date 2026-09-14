@@ -32,6 +32,7 @@ import {
 import styles from './SimpleControlApp.module.css';
 import SimpleRevenueImport from './SimpleRevenueImport';
 import { generateSimpleRevenuePdf } from '../lib/simple-report-pdf';
+import { BASIC_EXPENSE_MODES, updateBasicSettings } from '../lib/neon-basic-control';
 
 const money = value => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value || 0));
 const percent = value => `${Number(value || 0).toFixed(1).replace('.', ',')}%`;
@@ -218,11 +219,18 @@ export default function SimpleControlAppV2() {
   const previousPending = previousKey >= startMonth && previousKey < state.currentMonth && !previousSubmission;
 
   if (!company.controlStartMonth) {
-    return <Onboarding company={company} busy={busy} onSave={async ({ mode, startMonth: initialMonth }) => {
-      await run(async () => {
-        await updateSimpleSettings(company.id, { revenueMode: mode, controlTier: 'simple', controlStartMonth: initialMonth });
+    return <Onboarding company={company} busy={busy} onSave={async ({ tier, revenueMode, expenseMode, startMonth: initialMonth }) => {
+      const result = await run(async () => {
+        await updateBasicSettings(company.id, {
+          controlTier: tier,
+          controlStartMonth: initialMonth,
+          revenueMode,
+          expenseEnabled: tier === 'basic',
+          expenseMode: tier === 'basic' ? expenseMode : 'monthly'
+        });
         setMonth(initialMonth);
-      }, 'Controle Simples configurado.');
+      }, tier === 'basic' ? 'Controle Básico configurado.' : 'Controle Simples configurado.');
+      if (result !== null && tier === 'basic') window.location.reload();
     }} onLogout={signOut}/>;
   }
 
@@ -334,9 +342,40 @@ function Login({ onSubmit, busy, error }) {
 }
 
 function Onboarding({ company, busy, onSave, onLogout }) {
-  const [mode, setMode] = useState(company.revenueMode || 'monthly');
+  const [tier, setTier] = useState('simple');
+  const [revenueMode, setRevenueMode] = useState(company.revenueMode || 'monthly');
+  const [expenseMode, setExpenseMode] = useState('monthly');
   const [startMonth, setStartMonth] = useState(monthKey());
-  return <div className={styles.onboarding}><div className={styles.onboardingCard}><div className={styles.onboardingTop}><div className={styles.brandMark}>LG</div><button onClick={onLogout}>Sair</button></div><span className={styles.eyebrow}>Configuração da sua Central</span><h1>Como você quer controlar sua empresa?</h1><p>A escolha é sua. O contador acompanha a configuração, mas não decide o nível nem o modo por você.</p><div className={styles.infoBox}><strong>Controle Simples</strong><span>Para acompanhar o faturamento sem precisar controlar despesas, contas a pagar, contas a receber ou caixa. Este é o primeiro nível disponível nesta fase.</span></div><p><strong>Como você prefere registrar seu faturamento?</strong> Você poderá mudar este modo depois; a alteração passa a valer no mês seguinte para preservar o histórico.</p><div className={styles.modeGrid}>{SIMPLE_MODES.map(item => <button type="button" className={`${styles.modeCard} ${mode === item ? styles.modeCardActive : ''}`} key={item} onClick={() => setMode(item)}><strong>{modeName(item)}</strong><span>{item === 'monthly' ? 'Informe apenas quanto faturou no mês.' : item === 'daily' ? 'Informe quanto faturou em cada dia.' : 'Registre cada venda ou serviço com detalhes opcionais.'}</span></button>)}</div><div className={styles.onboardingFields}><label>Mês inicial<input type="month" value={startMonth} onChange={e => setStartMonth(e.target.value)}/></label><div className={styles.infoBox}><strong>Como o valor é interpretado</strong><span>Receita aqui significa faturamento bruto da venda ou serviço. O sistema não presume que o dinheiro já foi recebido.</span></div></div><button className={styles.primaryButton} disabled={busy || !startMonth} onClick={() => onSave({ mode, startMonth })}>{busy ? 'Configurando…' : 'Usar Controle Simples'}</button></div></div>;
+  return <div className={styles.onboarding}><div className={styles.onboardingCard}>
+    <div className={styles.onboardingTop}><div className={styles.brandMark}>LG</div><button onClick={onLogout}>Sair</button></div>
+    <span className={styles.eyebrow}>Configuração da sua Central</span>
+    <h1>Como você quer controlar sua empresa?</h1>
+    <p>A escolha é sua. O contador acompanha a configuração, mas não escolhe o nível nem o modo por você. Você pode começar mais simples e evoluir depois.</p>
+
+    <p><strong>1. Escolha o nível de controle</strong></p>
+    <div className={styles.modeGrid}>
+      <button type="button" className={`${styles.modeCard} ${tier === 'simple' ? styles.modeCardActive : ''}`} onClick={() => setTier('simple')}>
+        <strong>Controle Simples</strong><span>Acompanha apenas faturamento. Ideal para quem quer começar sem registrar despesas.</span>
+      </button>
+      <button type="button" className={`${styles.modeCard} ${tier === 'basic' ? styles.modeCardActive : ''}`} onClick={() => setTier('basic')}>
+        <strong>Controle Básico</strong><span>Acompanha faturamento, despesas e resultado gerencial, sem contas a pagar, receber ou caixa.</span>
+      </button>
+    </div>
+
+    <p><strong>2. Como você prefere registrar seu faturamento?</strong> Mudanças futuras passam a valer no mês seguinte para preservar o histórico.</p>
+    <div className={styles.modeGrid}>{SIMPLE_MODES.map(item => <button type="button" className={`${styles.modeCard} ${revenueMode === item ? styles.modeCardActive : ''}`} key={item} onClick={() => setRevenueMode(item)}><strong>{modeName(item)}</strong><span>{item === 'monthly' ? 'Informe apenas quanto faturou no mês.' : item === 'daily' ? 'Informe quanto faturou em cada dia.' : 'Registre cada venda ou serviço com detalhes opcionais.'}</span></button>)}</div>
+
+    {tier === 'basic' && <>
+      <p><strong>3. Como você prefere registrar suas despesas?</strong></p>
+      <div className={styles.modeGrid}>{BASIC_EXPENSE_MODES.map(item => <button type="button" className={`${styles.modeCard} ${expenseMode === item ? styles.modeCardActive : ''}`} key={item} onClick={() => setExpenseMode(item)}><strong>{item === 'monthly' ? 'Total do mês' : 'Cada despesa'}</strong><span>{item === 'monthly' ? 'Informe apenas o total de gastos do mês.' : 'Registre cada gasto com fornecedor, categoria e pagamento opcionais.'}</span></button>)}</div>
+    </>}
+
+    <div className={styles.onboardingFields}>
+      <label>Mês inicial<input type="month" value={startMonth} onChange={e => setStartMonth(e.target.value)}/></label>
+      <div className={styles.infoBox}><strong>Como os valores são interpretados</strong><span>Receita significa faturamento bruto da venda ou serviço. No Básico, despesa significa gasto do negócio referente ao período. A Central não presume recebimento, pagamento ou saldo bancário.</span></div>
+    </div>
+    <button className={styles.primaryButton} disabled={busy || !startMonth} onClick={() => onSave({ tier, revenueMode, expenseMode, startMonth })}>{busy ? 'Configurando…' : tier === 'basic' ? 'Usar Controle Básico' : 'Usar Controle Simples'}</button>
+  </div></div>;
 }
 
 function NavButton({ active, icon, label, onClick }) {
