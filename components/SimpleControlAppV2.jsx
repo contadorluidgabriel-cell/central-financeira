@@ -32,7 +32,7 @@ import {
 import styles from './SimpleControlApp.module.css';
 import SimpleRevenueImport from './SimpleRevenueImport';
 import { generateSimpleRevenuePdf } from '../lib/simple-report-pdf';
-import { BASIC_EXPENSE_MODES, scheduleControlTier, updateBasicSettings } from '../lib/neon-basic-control';
+import { BASIC_EXPENSE_MODES, updateBasicSettings } from '../lib/neon-basic-control';
 
 const money = value => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value || 0));
 const percent = value => `${Number(value || 0).toFixed(1).replace('.', ',')}%`;
