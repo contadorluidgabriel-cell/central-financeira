@@ -40,6 +40,13 @@ jobs:
           else
             echo "Basic polish already applied"
           fi
+      - name: Apply final Basic polish
+        run: |
+          if ! grep -q "PartyDetail" components/BasicControlAppV1.jsx; then
+            python scripts/apply-basic-final-polish.py
+          else
+            echo "Final Basic polish already applied"
+          fi
       - name: Install dependencies
         run: npm install
       - name: Build
@@ -53,5 +60,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add components/SimpleControlAppV2.jsx components/BasicControlAppV1.jsx components/SimpleControlApp.module.css lib/neon-simple-control.js
-          git commit -m "feat: refinar escolha e produtividade do Controle Básico"
+          git commit -m "feat: concluir acabamento do Controle Básico"
           git push origin HEAD:feat/controle-basico
