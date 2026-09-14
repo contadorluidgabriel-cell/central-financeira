@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@neondatabase/neon-js": "0.7.0-beta",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "next": "^15.2.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
