@@ -44,13 +44,13 @@ export default function CentralFinanceiraEntry() {
 
         const settingsResult = await neonTest
           .from('organization_settings')
-          .select('organization_id,control_tier,active')
+          .select('organization_id,control_tier,control_start_month,active')
           .eq('organization_id', organizationId)
           .limit(1);
         if (settingsResult.error) throw settingsResult.error;
 
         const settings = settingsResult.data?.[0] || null;
-        const useSimple = settings?.active !== false && settings?.control_tier === 'simple';
+        const useSimple = settings?.active !== false && (settings?.control_tier === 'unconfigured' || settings?.control_tier === 'simple' || !settings?.control_start_month);
         if (!cancelled) setExperience(useSimple ? 'simple' : 'v2');
       } catch {
         if (!cancelled) setExperience('v2');
