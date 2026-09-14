@@ -40,6 +40,7 @@ import {
   settlePayable,
   settleReceivable
 } from '../lib/neon-v2-data';
+import { createClientAccess, resetClientPassword, setClientAccessBlocked } from '../lib/client-access';
 import styles from './CentralFinanceiraV2.module.css';
 
 const money = value => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value || 0));
@@ -139,6 +140,8 @@ export default function CentralFinanceiraV2() {
   const [statusFilter, setStatusFilter] = useState('open');
   const [search, setSearch] = useState('');
   const [companyDraft, setCompanyDraft] = useState(defaultCompanyDraft());
+  const [accessDraft, setAccessDraft] = useState({ email: '' });
+  const [accessResult, setAccessResult] = useState(null);
 
   useEffect(() => {
     if (!toast) return;
@@ -334,7 +337,18 @@ export default function CentralFinanceiraV2() {
 
   function PortfolioTable({ rows }) {
     if (!rows.length) return <EmptyState icon="users" title="Nenhum cliente cadastrado" text="Cadastre a primeira empresa para começar a montar o acompanhamento financeiro." action={() => { setCompanyDraft(defaultCompanyDraft()); setModal({ type: 'company' }); }} actionLabel="Novo cliente"/>;
-    return <div className="tablewrap"><table><thead><tr><th>Cliente</th><th>Receitas</th><th>A receber</th><th>A pagar</th><th>Projeção</th><th>Competência</th><th/></tr></thead><tbody>{rows.map(c => { const s = summaryFor(c.id); const st = competenceStatus(c.id); return <tr key={c.id} className="clickable" onClick={() => openWorkspace(c.id)}><td><div className="companycell"><div className="avatar">{initials(c.name)}</div><div><strong>{c.name}</strong><span>{c.document || 'Documento não informado'}</span></div></div></td><td>{money(s.revenue)}</td><td>{money(s.receivable)}</td><td>{money(s.payable)}</td><td><b className={s.projected < 0 ? 'negative' : 'positive'}>{money(s.projected)}</b></td><td><span className={`status ${st[1]}`}>{st[0]}</span></td><td><Icon name="arrow"/></td></tr>; })}</tbody></table></div>;
+    return <div className="tablewrap"><table><thead><tr><th>Cliente</th><th>Acesso</th><th>Receitas</th><th>A receber</th><th>A pagar</th><th>Projeção</th><th>Competência</th><th/></tr></thead><tbody>{rows.map(c => {
+      const summary = summaryFor(c.id);
+      const competence = competenceStatus(c.id);
+      const access = (state.clientAccess || []).find(item => item.organizationId === c.id);
+      const accessLabel = !access ? 'Sem acesso' : !access.active ? 'Bloqueado' : access.mustChangePassword ? 'Senha provisória' : 'Ativo';
+      const accessClass = !access ? 'warn' : !access.active ? 'bad' : access.mustChangePassword ? 'warn' : 'good';
+      return <tr key={c.id} className="clickable" onClick={() => openWorkspace(c.id)}>
+        <td><div className="companycell"><div className="avatar">{initials(c.name)}</div><div><strong>{c.name}</strong><span>{c.document || 'Documento não informado'}</span></div></div></td>
+        <td><div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}><span className={`status ${accessClass}`}>{accessLabel}</span><button type="button" className="btn btn-secondary" style={{minHeight:32,padding:'6px 10px',fontSize:12}} onClick={event=>{event.stopPropagation();setAccessResult(null);setAccessDraft({email:access?.email||c.contact||''});setModal({type:'access',companyId:c.id})}}>{access?'Gerenciar':'Criar acesso'}</button></div></td>
+        <td>{money(summary.revenue)}</td><td>{money(summary.receivable)}</td><td>{money(summary.payable)}</td><td><b className={summary.projected < 0 ? 'negative' : 'positive'}>{money(summary.projected)}</b></td><td><span className={`status ${competence[1]}`}>{competence[0]}</span></td><td><Icon name="arrow"/></td>
+      </tr>;
+    })}</tbody></table></div>;
   }
 
   function MasterPortfolio() {
@@ -380,7 +394,7 @@ export default function CentralFinanceiraV2() {
   }
 
   function MasterSettings() {
-    return <><PageHeader title="Sistema" description="Estado da conta e da versão financeira atual."/><div className="grid sectiongrid"><section className="panel span7"><div className="panelhead"><div><h3>Conta</h3><p>Acesso principal da Central.</p></div></div><div className="panelbody"><div className="formgrid"><div className="field full"><label>Nome</label><input className="input" readOnly value={user.name || ''}/></div><div className="field"><label>E-mail</label><input className="input" readOnly value={user.email || ''}/></div><div className="field"><label>Perfil</label><input className="input" readOnly value="Super Admin"/></div></div></div></section><section className="panel span5"><div className="panelhead"><div><h3>Central Financeira V2</h3><p>Estrutura financeira conectada.</p></div></div><div className="panelbody"><div className="signal"><div className="signalicon good"><Icon name="check"/></div><div><strong>Motor financeiro ativo</strong><p>Receitas, despesas, contas, recebimentos, pagamentos, parcelamentos, recorrências, fluxo e orçamento.</p></div></div><div className="notice"><b>Validação:</b> esta versão continua na branch isolada de testes. Não use dados reais ainda.</div></div></section></div></>;
+    return <><PageHeader title="Sistema" description="Estado da conta e da versão financeira atual."/><div className="grid sectiongrid"><section className="panel span7"><div className="panelhead"><div><h3>Conta</h3><p>Acesso principal da Central.</p></div></div><div className="panelbody"><div className="formgrid"><div className="field full"><label>Nome</label><input className="input" readOnly value={user.name || ''}/></div><div className="field"><label>E-mail</label><input className="input" readOnly value={user.email || ''}/></div><div className="field"><label>Perfil</label><input className="input" readOnly value="Super Admin"/></div></div></div></section><section className="panel span5"><div className="panelhead"><div><h3>Central Financeira V2</h3><p>Estrutura financeira conectada.</p></div></div><div className="panelbody"><div className="signal"><div className="signalicon good"><Icon name="check"/></div><div><strong>Motor financeiro ativo</strong><p>Receitas, despesas, contas, recebimentos, pagamentos, parcelamentos, recorrências, fluxo e orçamento.</p></div></div><div className="notice"><b>Ambiente oficial:</b> esta versão usa o backend Neon de produção. O uso com clientes reais deve aguardar a auditoria final de isolamento e permissões.</div></div></section></div></>;
   }
 
   function Overview({ c }) {
@@ -579,9 +593,118 @@ export default function CentralFinanceiraV2() {
   function Modal() {
     if (!modal) return null;
     const c = company(modal.companyId);
-    if (modal.type === 'company') return <ModalShell title="Novo cliente" footer={<><button className="btn btn-secondary" onClick={()=>setModal(null)}>Cancelar</button><button className="btn btn-primary" disabled={busy||!companyDraft.name.trim()} onClick={async()=>{const id=await run(()=>createCompanyV2(companyDraft),null,{refreshAfter:false});if(id){await refresh(false);setModal(null);setCompanyDraft(defaultCompanyDraft());setToast('Cliente criado. A configuração financeira será escolhida por ele no primeiro acesso.')}}}>Criar cliente</button></>}><div className={styles.formGrid2}><div className="field full"><label>Nome da empresa</label><input className="input" value={companyDraft.name} onChange={e=>setCompanyDraft(d=>({...d,name:e.target.value}))} autoFocus/></div><div className="field"><label>CNPJ / CPF</label><input className="input" value={companyDraft.document} onChange={e=>setCompanyDraft(d=>({...d,document:e.target.value}))}/></div><div className="field"><label>E-mail principal</label><input className="input" type="email" value={companyDraft.contact} onChange={e=>setCompanyDraft(d=>({...d,contact:e.target.value}))}/></div></div><div className={styles.modalHint}><b>Configuração pelo cliente:</b> você cadastra a empresa e libera o acesso. No primeiro acesso, o próprio cliente escolhe o nível de controle e como deseja acompanhar as informações.</div></ModalShell>;
+    if (modal.type === 'company') return <ModalShell title="Novo cliente" footer={<><button className="btn btn-secondary" onClick={()=>setModal(null)}>Cancelar</button><button className="btn btn-primary" disabled={busy||!companyDraft.name.trim()} onClick={async()=>{
+      const draft={...companyDraft};
+      const id=await run(()=>createCompanyV2(draft),null,{refreshAfter:false});
+      if(id){
+        await refresh(false);
+        setCompanyDraft(defaultCompanyDraft());
+        if(draft.contact.trim()){
+          setAccessResult(null);
+          setAccessDraft({email:draft.contact.trim()});
+          setModal({type:'access',companyId:id});
+        } else {
+          setModal(null);
+          setToast('Cliente criado. Crie o acesso quando tiver o e-mail de login.');
+        }
+      }
+    }}>Criar cliente</button></>}>
+      <div className={styles.formGrid2}>
+        <div className="field full"><label>Nome da empresa</label><input className="input" value={companyDraft.name} onChange={e=>setCompanyDraft(d=>({...d,name:e.target.value}))} autoFocus/></div>
+        <div className="field"><label>CNPJ / CPF</label><input className="input" value={companyDraft.document} onChange={e=>setCompanyDraft(d=>({...d,document:e.target.value}))}/></div>
+        <div className="field"><label>E-mail principal</label><input className="input" type="email" value={companyDraft.contact} onChange={e=>setCompanyDraft(d=>({...d,contact:e.target.value}))}/></div>
+      </div>
+      <div className={styles.modalHint}><b>Próxima etapa:</b> cadastre a empresa aqui. Depois, crie o acesso com e-mail e senha provisória. No primeiro login, o cliente troca a senha e escolhe como quer controlar a própria empresa.</div>
+    </ModalShell>;
 
     if (!c) return null;
+
+    if (modal.type === 'access') {
+      const access = (state.clientAccess || []).find(item => item.organizationId === c.id) || null;
+      const statusLabel = !access ? 'Sem acesso' : !access.active ? 'Bloqueado' : access.mustChangePassword ? 'Senha provisória' : 'Ativo';
+
+      const closeAccess = () => {
+        setAccessResult(null);
+        setModal(null);
+      };
+
+      const copyCredentials = async () => {
+        if (!accessResult?.temporaryPassword) return;
+        const text = `Central Financeira\nAcesso: https://centralfinanceira-peach.vercel.app\nE-mail: ${accessResult.email}\nSenha provisória: ${accessResult.temporaryPassword}\n\nNo primeiro acesso, crie sua senha pessoal.`;
+        try {
+          await navigator.clipboard.writeText(text);
+          setToast('Credenciais copiadas.');
+        } catch {
+          setToast('Não foi possível copiar automaticamente.');
+        }
+      };
+
+      const createAccess = async () => {
+        const result = await run(
+          ()=>createClientAccess({organizationId:c.id,email:accessDraft.email,name:c.name}),
+          null,
+          {refreshAfter:false}
+        );
+        if(result){
+          setAccessResult(result);
+          await refresh(true);
+          setToast('Acesso criado com senha provisória.');
+        }
+      };
+
+      const resetPassword = async () => {
+        const result = await run(
+          ()=>resetClientPassword({userId:access.userId,email:access.email}),
+          null,
+          {refreshAfter:false}
+        );
+        if(result){
+          setAccessResult(result);
+          await refresh(true);
+          setToast('Nova senha provisória gerada.');
+        }
+      };
+
+      const toggleBlocked = async () => {
+        const blocked = access.active;
+        const result = await run(async()=>{
+          await setClientAccessBlocked({userId:access.userId,blocked});
+          return true;
+        },null,{refreshAfter:false});
+        if(result){
+          setAccessResult(null);
+          await refresh(true);
+          setToast(blocked?'Acesso bloqueado.':'Acesso reativado.');
+        }
+      };
+
+      return <ModalShell title="Acesso do cliente" footer={<><button className="btn btn-secondary" onClick={closeAccess}>Fechar</button>{!access&&!accessResult&&<button className="btn btn-primary" disabled={busy||!accessDraft.email.trim()} onClick={createAccess}>Criar acesso</button>}</>}>
+        <div style={{display:'grid',gap:16}}>
+          <div><strong style={{display:'block',fontSize:15}}>{c.name}</strong><span className="muted" style={{fontSize:13}}>{c.document || 'Documento não informado'}</span></div>
+          {accessResult?.temporaryPassword ? <>
+            <div className={styles.modalHint}><b>Senha provisória criada.</b> Ela é mostrada somente agora. Copie as credenciais e envie ao cliente pelo seu canal habitual.</div>
+            <div className={styles.formGrid2}>
+              <div className="field full"><label>E-mail de login</label><input className="input" readOnly value={accessResult.email}/></div>
+              <div className="field full"><label>Senha provisória</label><input className="input" readOnly value={accessResult.temporaryPassword} onFocus={e=>e.currentTarget.select()}/></div>
+            </div>
+            <button type="button" className="btn btn-primary" onClick={copyCredentials}>Copiar credenciais</button>
+          </> : !access ? <>
+            <div className="field"><label>E-mail de login</label><input className="input" type="email" value={accessDraft.email} onChange={e=>setAccessDraft({email:e.target.value})} autoFocus/><span className="help">O sistema gera uma senha provisória. No primeiro login, o cliente será obrigado a criar a própria senha.</span></div>
+          </> : <>
+            <div className={styles.settlementSummary}>
+              <div><span>Status</span><strong>{statusLabel}</strong></div>
+              <div><span>E-mail</span><strong style={{fontSize:13}}>{access.email}</strong></div>
+              <div><span>Último acesso</span><strong style={{fontSize:13}}>{access.lastLoginAt?new Date(access.lastLoginAt).toLocaleString('pt-BR'):'Ainda não acessou'}</strong></div>
+            </div>
+            <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+              <button type="button" className="btn btn-secondary" disabled={busy||!access.active} onClick={resetPassword}>Redefinir senha</button>
+              <button type="button" className="btn btn-secondary" disabled={busy} onClick={toggleBlocked}>{access.active?'Bloquear acesso':'Reativar acesso'}</button>
+            </div>
+            <div className={styles.modalHint}>{access.mustChangePassword?<><b>Senha provisória pendente:</b> o cliente ainda precisa entrar e criar a própria senha.</>:<><b>Acesso ativo:</b> a senha atual nunca é exibida ao administrador. Se o cliente esquecer, gere uma nova senha provisória.</>}</div>
+          </>}
+        </div>
+      </ModalShell>;
+    }
     if (modal.type === 'registerMenu') {
       const actions = registrationActionsFor(c, modal.sourceView);
       const groups = [...new Set(actions.map(action => action.group))];
@@ -642,6 +765,6 @@ export default function CentralFinanceiraV2() {
   else content = <MasterPortfolio/>;
 
   const title = currentCompany ? currentCompany.name : ({ portfolio:'Visão geral',clients:'Clientes',closings:'Fechamentos',settings:'Configurações' }[state.masterView] || 'Central Financeira');
-  return <><div className="shell"><Sidebar/><main className="main"><header className="topbar"><div className="crumb">Central Financeira <span>›</span><strong>{title}</strong></div><div className="topright">{monthControl}<div className="avatar">{initials(user.name||'LG')}</div></div></header><div className={`content ${styles.contentPad}`}>{error&&<div className="notice" style={{marginTop:0,marginBottom:14,color:'var(--danger)',borderColor:'#F2C9C5'}}>{error}</div>}{content}</div></main></div><Modal/>{toast&&<div className="toast">{toast}</div>}</>;
+  return <><div className="shell"><Sidebar/><main className="main"><header className="topbar"><div className="crumb">Central Financeira <span>›</span><strong>{title}</strong></div><div className="topright">{monthControl}<div className="avatar">{initials(user.name||'LG')}</div></div></header><div className={`content ${styles.contentPad}`}>{error&&<div className="notice" style={{marginTop:0,marginBottom:14,color:'var(--danger)',borderColor:'#F2C9C5'}}>{error}</div>}{content}</div></main></div>{Modal()}{toast&&<div className="toast">{toast}</div>}</>;
 }
 
