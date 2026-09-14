@@ -10,6 +10,7 @@ import {
   deleteSimpleRevenue,
   deleteUnusedSimpleCustomer,
   loadSimpleControlData,
+  importSimpleRevenueRows,
   markSimpleNotificationRead,
   mergeSimpleCustomers,
   monthKey,
@@ -29,6 +30,7 @@ import {
   updateSimpleSettings
 } from '../lib/neon-simple-control';
 import styles from './SimpleControlApp.module.css';
+import SimpleRevenueImport from './SimpleRevenueImport';
 
 const money = value => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value || 0));
 const percent = value => `${Number(value || 0).toFixed(1).replace('.', ',')}%`;
@@ -255,7 +257,7 @@ export default function SimpleControlAppV2() {
         {state.systemRole === 'super_admin' && <NotificationStrip notifications={state.notifications.filter(n => !n.read_at).slice(0, 3)} onRead={id => run(() => markSimpleNotificationRead(id), '')}/>} 
 
         {view === 'overview' && <Overview mode={periodMode} month={month} entries={currentEntries} previousEntries={previousEntries} status={status} locked={locked} onAdd={() => setModal({ type: 'revenue' })} onClosing={() => setView('closing')} onViewRevenues={() => setView('revenues')}/>} 
-        {view === 'revenues' && <Revenues mode={periodMode} month={month} currentMonth={state.currentMonth} entries={currentEntries} categories={categories} customers={customers} paymentMethods={paymentMethods} locked={locked} search={search} setSearch={setSearch} filters={filters} setFilters={setFilters} onAdd={() => setModal({ type: 'revenue' })} onEdit={entry => setModal({ type: 'revenue', entry })} onDelete={entry => run(() => deleteSimpleRevenue(entry.id), 'Receita excluída.')} onCancel={entry => setModal({ type: 'cancel', entry })} onAdjustment={() => setModal({ type: 'adjustment' })}/>} 
+        {view === 'revenues' && <Revenues mode={periodMode} month={month} currentMonth={state.currentMonth} entries={currentEntries} categories={categories} customers={customers} paymentMethods={paymentMethods} locked={locked} search={search} setSearch={setSearch} filters={filters} setFilters={setFilters} onAdd={() => setModal({ type: 'revenue' })} onImport={() => setModal({ type: 'import' })} onEdit={entry => setModal({ type: 'revenue', entry })} onDelete={entry => run(() => deleteSimpleRevenue(entry.id), 'Receita excluída.')} onCancel={entry => setModal({ type: 'cancel', entry })} onAdjustment={() => setModal({ type: 'adjustment' })}/>} 
         {view === 'customers' && currentControlIsIndividual && <Customers customers={customers} allEntries={state.entries.filter(e => e.companyId === company.id)} search={search} setSearch={setSearch} onCreate={() => setModal({ type: 'customer' })} onEdit={customer => setModal({ type: 'customer', customer })} onToggle={customer => run(() => setSimpleCustomerActive(customer.id, !customer.active), customer.active ? 'Cliente inativado.' : 'Cliente reativado.')} onDelete={customer => run(() => deleteUnusedSimpleCustomer(customer.id), 'Cliente excluído.')} onOpen={customer => setModal({ type: 'customerDetail', customer })} onMerge={() => setModal({ type: 'mergeCustomer' })}/>} 
         {view === 'reports' && <Reports mode={periodMode} company={company} month={month} entries={state.entries.filter(e => e.companyId === company.id)}/>} 
         {view === 'closing' && <Closing month={month} currentMonth={state.currentMonth} entries={currentEntries} submission={currentSubmission} status={status} busy={busy} onComplete={noMovement => run(() => completeSimpleMonth({ organizationId: company.id, month, revenueMode: periodMode, noMovement }), 'Mês concluído.')} onReopen={() => setModal({ type: 'reopen' })}/>} 
@@ -265,12 +267,17 @@ export default function SimpleControlAppV2() {
 
     <MobileNav view={view} individual={currentControlIsIndividual} onNavigate={navigate}/>
 
-    {modal && <Modal title={modalTitle(modal.type)} onClose={() => !busy && setModal(null)}>
+    {modal && <Modal title={modalTitle(modal.type)} wide={modal.type === 'import'} onClose={() => !busy && setModal(null)}>
       {modal.type === 'revenue' && <RevenueForm mode={periodMode} month={month} entry={modal.entry} draft={modal.draft} categories={categories.filter(c => c.active)} customers={customers.filter(c => c.active)} paymentMethods={paymentMethods.filter(p => p.active)} busy={busy} onQuickCustomer={draft => setModal({ type: 'customer', returnToRevenue: true, revenueDraft: draft })} onSubmit={async payload => {
         const consumer = customers.find(c => c.is_consumer_final);
         const finalPayload = periodMode === 'individual' && !payload.customerId ? { ...payload, customerId: consumer?.id || null } : payload;
         const result = await run(() => saveSimpleRevenue({ ...finalPayload, existingId: modal.entry?.id || null, organizationId: company.id, month, mode: periodMode }), modal.entry ? 'Receita atualizada.' : 'Receita registrada.');
         if (result !== null) setModal(null);
+      }}/>} 
+      {modal.type === 'import' && <SimpleRevenueImport mode={periodMode} month={month} existingEntries={currentEntries} categories={categories} customers={customers} paymentMethods={paymentMethods} busy={busy} onConfirm={async rows => {
+        const result = await run(() => importSimpleRevenueRows({ organizationId: company.id, month, mode: periodMode, rows }), `${rows.length} ${rows.length === 1 ? 'receita importada' : 'receitas importadas'}.`);
+        if (result !== null) setModal(null);
+        return result;
       }}/>} 
       {modal.type === 'customer' && <CustomerForm customer={modal.customer} busy={busy} onSubmit={async payload => {
         const sameName = customers.find(c => c.id !== modal.customer?.id && c.name.toLowerCase() === payload.name.trim().toLowerCase());
@@ -389,7 +396,7 @@ function Metric({ label, value, detail }) {
   return <div className={styles.metric}><span>{label}</span><strong>{value}</strong><small>{detail}</small></div>;
 }
 
-function Revenues({ mode, month, currentMonth, entries, categories, customers, paymentMethods, locked, search, setSearch, filters, setFilters, onAdd, onEdit, onDelete, onCancel, onAdjustment }) {
+function Revenues({ mode, month, currentMonth, entries, categories, customers, paymentMethods, locked, search, setSearch, filters, setFilters, onAdd, onImport, onEdit, onDelete, onCancel, onAdjustment }) {
   const normalized = search.trim().toLowerCase();
   const historicalLocked = locked && month < currentMonth;
   const list = entries.filter(entry => {
@@ -400,7 +407,7 @@ function Revenues({ mode, month, currentMonth, entries, categories, customers, p
     return true;
   }).sort((a, b) => String(b.date).localeCompare(String(a.date)));
   return <>
-    <PageHeader title="Receitas" description={`Faturamento de ${monthName(month).toLowerCase()}.`}>{!locked && <><button className={styles.secondaryButtonSmall} onClick={onAdjustment}>Ajuste</button><button className={styles.primaryButtonSmall} onClick={onAdd}><Icon name="plus"/>Registrar</button></>}</PageHeader>
+    <PageHeader title="Receitas" description={`Faturamento de ${monthName(month).toLowerCase()}.`}>{!locked && <><button className={styles.secondaryButtonSmall} onClick={onImport}><Icon name="download"/>Importar Excel/CSV</button><button className={styles.secondaryButtonSmall} onClick={onAdjustment}>Ajuste</button><button className={styles.primaryButtonSmall} onClick={onAdd}><Icon name="plus"/>Registrar</button></>}</PageHeader>
     {locked && <div className={styles.lockBar}><Icon name="lock"/><div><strong>Mês concluído</strong><span>{historicalLocked ? 'O histórico permanece bloqueado. Cancelamentos posteriores viram estorno no mês atual.' : 'Reabra o período antes de alterar lançamentos.'}</span></div></div>}
     <div className={styles.toolbar}><label className={styles.searchBox}><Icon name="search"/><input placeholder="Buscar receita" value={search} onChange={e => setSearch(e.target.value)}/></label>{mode === 'individual' && <><select value={filters.customer} onChange={e => setFilters({ ...filters, customer: e.target.value })}><option value="">Todos os clientes</option>{customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select><select value={filters.category} onChange={e => setFilters({ ...filters, category: e.target.value })}><option value="">Todas as categorias</option>{categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select><select value={filters.payment} onChange={e => setFilters({ ...filters, payment: e.target.value })}><option value="">Todos os meios</option>{paymentMethods.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></>}</div>
     <section className={styles.panel}><div className={styles.tableWrap}><table><thead><tr><th>Data</th><th>Descrição</th>{mode === 'individual' && <><th>Cliente</th><th>Categoria</th><th>Pagamento</th></>}<th>Status</th><th>Valor</th><th/></tr></thead><tbody>{list.map(entry => <tr key={entry.id}><td>{formatDate(entry.date)}</td><td><strong>{entry.description || (entry.entry_status === 'adjustment' ? 'Ajuste de faturamento' : 'Receita')}</strong></td>{mode === 'individual' && <><td>{entry.customer?.name || 'Consumidor final'}</td><td>{entry.category?.name || '—'}</td><td>{entry.paymentMethod?.name || 'Não informado'}</td></>}<td><StatusPill entry={entry}/></td><td className={styles.moneyCell}>{entry.entry_status === 'adjustment' && entry.adjustment_kind === 'negative' ? '− ' : entry.entry_status === 'adjustment' && entry.adjustment_kind === 'positive' ? '+ ' : ''}{money(entry.amount)}</td><td><div className={styles.rowActions}>{entry.entry_status === 'active' && <>{!locked && <><button title="Editar" aria-label="Editar receita" onClick={() => onEdit(entry)}><Icon name="edit"/></button><button title="Excluir lançamento incorreto" aria-label="Excluir receita" onClick={() => { if (window.confirm('Excluir este lançamento? Use cancelar/estornar quando a venda realmente existiu.')) onDelete(entry); }}><Icon name="trash"/></button></>} {(!locked || historicalLocked) && <button title={historicalLocked ? 'Estornar no mês atual' : 'Cancelar ou estornar'} aria-label={historicalLocked ? 'Estornar receita no mês atual' : 'Cancelar receita'} onClick={() => onCancel(entry)}><Icon name="refresh"/></button>}</>}</div></td></tr>)}</tbody></table>{!list.length && <div className={styles.emptyInline}>Nenhum lançamento encontrado.</div>}</div></section>
@@ -439,7 +446,24 @@ function Reports({ mode, company, month, entries }) {
     const blob = new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `receitas-${company.name.replace(/\s+/g, '-').toLowerCase()}.csv`; a.click(); URL.revokeObjectURL(url);
   };
-  return <><PageHeader title="Relatórios" description="Análises proporcionais ao nível de detalhe que você registra."><button className={styles.secondaryButtonSmall} onClick={exportCsv}><Icon name="download"/>Exportar CSV</button></PageHeader><div className={styles.reportGrid}><ReportCard title="Evolução mensal" rows={monthly.slice(-12).map(item => [monthName(item.key), item.value])}/>{mode === 'individual' && <><ReportCard title="Por cliente" rows={customersData.slice(0, 8)}/><ReportCard title="Por categoria" rows={categoriesData.slice(0, 8)}/><ReportCard title="Por meio de pagamento" rows={paymentData.slice(0, 8)}/></>}</div></>;
+  const exportExcel = async () => {
+    const XLSX = await import('xlsx');
+    const rows = entries.map(e => ({
+      Data: formatDate(e.date),
+      Competência: e.month,
+      Valor: Number(e.amount || 0),
+      Descrição: e.description || '',
+      Cliente: e.customer?.name || '',
+      Categoria: e.category?.name || '',
+      'Meio de pagamento': e.paymentMethod?.name || '',
+      Status: e.entry_status
+    }));
+    const workbook = XLSX.utils.book_new();
+    const sheet = XLSX.utils.json_to_sheet(rows);
+    XLSX.utils.book_append_sheet(workbook, sheet, 'Receitas');
+    XLSX.writeFile(workbook, `receitas-${company.name.replace(/\s+/g, '-').toLowerCase()}.xlsx`);
+  };
+  return <><PageHeader title="Relatórios" description="Análises proporcionais ao nível de detalhe que você registra."><button className={styles.secondaryButtonSmall} onClick={exportCsv}><Icon name="download"/>CSV</button><button className={styles.secondaryButtonSmall} onClick={exportExcel}><Icon name="download"/>Excel</button></PageHeader><div className={styles.reportGrid}><ReportCard title="Evolução mensal" rows={monthly.slice(-12).map(item => [monthName(item.key), item.value])}/>{mode === 'individual' && <><ReportCard title="Por cliente" rows={customersData.slice(0, 8)}/><ReportCard title="Por categoria" rows={categoriesData.slice(0, 8)}/><ReportCard title="Por meio de pagamento" rows={paymentData.slice(0, 8)}/></>}</div></>;
 }
 
 function ReportCard({ title, rows }) {
@@ -522,12 +546,12 @@ function ReopenForm({ month, busy, onSubmit }) {
   return <form className={styles.form} onSubmit={e => { e.preventDefault(); onSubmit(reason); }}><div className={styles.infoBox}><strong>Reabrir {monthName(month)}</strong><span>O período voltará a aceitar inclusões, edições e exclusões. A reabertura ficará registrada no histórico e o contador será avisado dentro da Central.</span></div><label className={styles.fullField}>Motivo da reabertura<input value={reason} onChange={e => setReason(e.target.value)} required placeholder="Ex.: esqueci de lançar uma receita"/></label><div className={styles.formFooter}><button className={styles.primaryButton} disabled={busy || !reason.trim()}>Reabrir mês</button></div></form>;
 }
 
-function Modal({ title, onClose, children }) {
-  return <div className={styles.modalBackdrop} onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}><div className={styles.modal}><div className={styles.modalHead}><div><span className={styles.eyebrow}>Controle Simples</span><h2>{title}</h2></div><button onClick={onClose}>×</button></div><div className={styles.modalBody}>{children}</div></div></div>;
+function Modal({ title, wide = false, onClose, children }) {
+  return <div className={styles.modalBackdrop} onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}><div className={`${styles.modal} ${wide ? styles.modalWide : ''}`}><div className={styles.modalHead}><div><span className={styles.eyebrow}>Controle Simples</span><h2>{title}</h2></div><button onClick={onClose}>×</button></div><div className={styles.modalBody}>{children}</div></div></div>;
 }
 
 function modalTitle(type) {
-  return ({ revenue: 'Registrar receita', customer: 'Cliente', customerDetail: 'Detalhes do cliente', mergeCustomer: 'Mesclar clientes', category: 'Categoria', payment: 'Meio de pagamento', adjustment: 'Ajuste de faturamento', cancel: 'Cancelar / estornar receita', reopen: 'Reabrir mês' })[type] || 'Central Financeira';
+  return ({ revenue: 'Registrar receita', import: 'Importar receitas', customer: 'Cliente', customerDetail: 'Detalhes do cliente', mergeCustomer: 'Mesclar clientes', category: 'Categoria', payment: 'Meio de pagamento', adjustment: 'Ajuste de faturamento', cancel: 'Cancelar / estornar receita', reopen: 'Reabrir mês' })[type] || 'Central Financeira';
 }
 
 function NotificationStrip({ notifications, onRead }) {
