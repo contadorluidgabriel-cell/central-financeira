@@ -4,76 +4,68 @@ Plataforma de acompanhamento financeiro para clientes do escritório Contador Lu
 
 ## Estado atual
 
-- Aplicação migrada para React + Next.js
+- Aplicação oficial em React + Next.js
 - Visual baseado no design system MED 12.1
-- Usuário Master e visão do cliente
-- Controle modular de receitas e despesas
-- Confirmação de competência
-- Categorias padrão e personalizadas por empresa
-- Fechamento e bloqueio por competência
-- Persistência local ainda mantida no painel principal
-- Neon Auth + Data API ativos em ambiente isolado de teste
-- RLS multiempresa em validação
+- Controle Simples publicado
+- Controle Básico publicado
+- Receitas, despesas, clientes e fornecedores
+- Importação CSV/XLSX com prévia e validação
+- Relatórios CSV, Excel e PDF
+- Fechamento, reabertura e histórico por competência
+- Neon Auth + Data API no branch oficial `production`
+- RLS multiempresa aplicada na estrutura atual
 - CI de build no GitHub Actions
-- Projeto conectado à Vercel para validação do `/neon-test`
+- Deploy oficial na Vercel
 
-## Estrutura
+## Produção
+
+Aplicação oficial:
+
+`https://centralfinanceira-peach.vercel.app`
+
+Rotas principais:
+
+- `/` — entrada e roteamento da Central
+- `/simples` — Controle Simples
+- `/basico` — Controle Básico
+
+O branch Neon oficial é o branch padrão `production`. O antigo branch vazio de produção foi preservado como `production-legacy-empty` e existe também um backup anterior à promoção.
+
+## Estrutura atual
 
 ```text
 app/
-  globals.css
-  layout.jsx
   page.jsx
-  neon-test/
-    page.jsx
+  simples/page.jsx
+  basico/page.jsx
 components/
-  CentralFinanceiraApp.jsx
-  NeonTestPanel.jsx
+  CentralFinanceiraEntry.jsx
+  SimpleControlAppV2.jsx
+  BasicControlAppV1.jsx
 lib/
-  demo-data.js
   neon-test-client.js
+  neon-simple-control.js
+  neon-basic-control.js
+migrations/
+  20260913_controle_simples.sql
+  20260913_controle_simples_integrity.sql
+  20260914_controle_basico.sql
 ```
 
-## Rodar localmente
-
-```bash
-npm install
-cp .env.example .env.local
-npm run dev
-```
-
-Painel atual: `http://localhost:3000`
-
-Laboratório Neon: `http://localhost:3000/neon-test`
-
-## Neon Test Lab
-
-A rota `/neon-test` usa uma branch Neon isolada para validar o backend antes de substituir a persistência local do painel principal. Ela permite testar:
-
-- cadastro e login via Neon Auth;
-- criação e troca de organização;
-- contexto de organização no JWT;
-- escrita e leitura de `financial_entries` pela Data API;
-- isolamento por RLS;
-- confirmação da competência e bloqueio posterior de lançamentos.
-
-Use somente informações fictícias nesse ambiente.
-
-## Build
-
-```bash
-npm run build
-```
+> `lib/neon-test-client.js` mantém o nome histórico apenas por compatibilidade interna. Seus endpoints padrão já apontam para o branch Neon oficial de produção.
 
 ## Próxima etapa
 
-1. Validar o fluxo completo no `/neon-test`
-2. Promover o usuário Master de teste na tabela `app_users`
-3. Testar duas organizações e confirmar isolamento entre tenants
-4. Integrar o painel principal à camada Neon
-5. Remover `localStorage`
-6. Validar o deployment da Vercel com as variáveis públicas do Neon configuradas
+O próximo bloco de produto é concluir o acesso do cliente:
+
+1. criação de acesso pelo administrador;
+2. senha provisória;
+3. troca obrigatória no primeiro acesso;
+4. redefinição de senha;
+5. bloqueio e reativação;
+6. vínculo seguro entre usuário e organização;
+7. auditoria final de isolamento multiempresa antes do uso com dados reais de clientes.
 
 ## Segurança
 
-O painel principal ainda é demonstração. Não utilizar dados reais de clientes até que o fluxo Neon esteja validado, o `localStorage` seja removido e as políticas RLS definitivas sejam promovidas para `production`.
+O código e a infraestrutura atuais estão oficializados, mas o fluxo completo de acesso do cliente ainda precisa ser concluído e auditado antes de liberar dados reais de clientes. O repositório também deve ser mantido sem segredos; apenas endpoints públicos podem aparecer no código cliente.
