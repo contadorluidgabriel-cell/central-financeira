@@ -359,7 +359,6 @@ function Login({ onSubmit, busy, error }) {
       <label>E-mail<input name="email" type="email" required autoComplete="email" placeholder="seuemail@empresa.com"/></label>
       <label>Senha<input name="password" type="password" required autoComplete="current-password" placeholder="Sua senha"/></label>
       <button className={styles.primaryButton} disabled={busy}>{busy ? 'Entrando…' : 'Entrar'}</button>
-      <div className={styles.infoBox}><strong>Ambiente de teste</strong><span>Este preview está conectado somente à estrutura de testes da Central Financeira.</span></div>
     </form>
   </div>;
 }
@@ -390,7 +389,7 @@ function Onboarding({ company, busy, onSave, onLogout }) {
 
     {tier === 'basic' && <>
       <p><strong>3. Como você prefere registrar suas despesas?</strong></p>
-      <div className={styles.modeGrid}>{BASIC_EXPENSE_MODES.map(item => <button type="button" className={`${styles.modeCard} ${expenseMode === item ? styles.modeCardActive : ''}`} key={item} onClick={() => setExpenseMode(item)}><strong>{item === 'monthly' ? 'Total do mês' : 'Cada despesa'}</strong><span>{item === 'monthly' ? 'Informe apenas o total de gastos do mês.' : 'Registre cada gasto com fornecedor, categoria e pagamento opcionais.'}</span></button>)}</div>
+      <div className={styles.modeGrid}>{BASIC_EXPENSE_MODES.map(item => <button type="button" className={`${styles.modeCard} ${expenseMode === item ? styles.modeCardActive : ''}`} key={item} onClick={() => setExpenseMode(item)}><strong>{item === 'monthly' ? 'Total do mês' : item === 'daily' ? 'Total por dia' : 'Cada despesa'}</strong><span>{item === 'monthly' ? 'Informe apenas o total de gastos do mês.' : item === 'daily' ? 'Informe quanto a empresa gastou em cada dia.' : 'Registre cada gasto com fornecedor, categoria e pagamento opcionais.'}</span></button>)}</div>
     </>}
 
     <div className={styles.onboardingFields}>

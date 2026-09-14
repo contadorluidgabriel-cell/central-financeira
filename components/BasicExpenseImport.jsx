@@ -9,7 +9,7 @@ import {
 import styles from './SimpleRevenueImport.module.css';
 
 const money = value => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value || 0));
-const modeName = mode => mode === 'monthly' ? 'Total do mês' : 'Cada despesa';
+const modeName = mode => ({ monthly: 'Total do mês', daily: 'Total por dia', individual: 'Cada despesa' })[mode] || mode;
 const formatDate = value => value ? String(value).slice(0, 10).split('-').reverse().join('/') : '—';
 
 export default function BasicExpenseImport({
@@ -101,7 +101,7 @@ export default function BasicExpenseImport({
       <div className={styles.rules}>
         <strong>Antes de importar</strong>
         <span>Despesa representa um gasto do negócio referente ao período. O sistema não presume que o valor já saiu da conta bancária.</span>
-        <span>{mode === 'monthly' ? 'Só pode existir um total mensal ativo de despesas no período.' : 'Possíveis duplicidades são avisadas e começam desmarcadas, mas a decisão final continua sendo sua.'}</span>
+        <span>{mode === 'monthly' ? 'Só pode existir um total mensal ativo de despesas no período.' : mode === 'daily' ? 'Só pode existir um total ativo de despesas por dia.' : 'Possíveis duplicidades são avisadas e começam desmarcadas, mas a decisão final continua sendo sua.'}</span>
       </div>
     </div>;
   }
