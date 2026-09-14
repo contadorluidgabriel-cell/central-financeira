@@ -6,40 +6,17 @@ on:
   pull_request:
     branches: [main]
 
-permissions:
-  contents: write
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Apply pending client-choice fix
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: |
-          if [ -f scripts/apply-client-choice-fix.py ]; then
-            python scripts/apply-client-choice-fix.py
-          fi
       - name: Install dependencies
         run: npm install
       - name: Build
         run: npm run build
-      - name: Commit generated fix
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: |
-          if git diff --quiet; then
-            echo "No generated changes"
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add components/CentralFinanceiraV2.jsx components/CentralFinanceiraEntry.jsx components/SimpleControlAppV2.jsx lib/neon-v2-data.js
-          git commit -m "fix: deixar nivel e modo de controle com o cliente"
-          git push origin HEAD:main
