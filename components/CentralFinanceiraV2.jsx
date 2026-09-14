@@ -342,7 +342,7 @@ export default function CentralFinanceiraV2() {
       const competence = competenceStatus(c.id);
       const access = (state.clientAccess || []).find(item => item.organizationId === c.id);
       const accessLabel = !access ? 'Sem acesso' : !access.active ? 'Bloqueado' : access.mustChangePassword ? 'Senha provisória' : 'Ativo';
-      const accessClass = !access ? 'warn' : !access.active ? 'bad' : access.mustChangePassword ? 'warn' : 'good';
+      const accessClass = !access ? 'wait' : !access.active ? 'closed' : access.mustChangePassword ? 'wait' : 'ok';
       return <tr key={c.id} className="clickable" onClick={() => openWorkspace(c.id)}>
         <td><div className="companycell"><div className="avatar">{initials(c.name)}</div><div><strong>{c.name}</strong><span>{c.document || 'Documento não informado'}</span></div></div></td>
         <td><div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}><span className={`status ${accessClass}`}>{accessLabel}</span><button type="button" className="btn btn-secondary" style={{minHeight:32,padding:'6px 10px',fontSize:12}} onClick={event=>{event.stopPropagation();setAccessResult(null);setAccessDraft({email:access?.email||c.contact||''});setModal({type:'access',companyId:c.id})}}>{access?'Gerenciar':'Criar acesso'}</button></div></td>
