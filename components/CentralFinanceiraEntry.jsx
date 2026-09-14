@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { neonTest } from '../lib/neon-test-client';
 import CentralFinanceiraV2 from './CentralFinanceiraV2';
 import SimpleControlAppV2 from './SimpleControlAppV2';
+import BasicControlAppV1 from './BasicControlAppV1';
 
 export default function CentralFinanceiraEntry() {
   const session = neonTest.auth.useSession();
@@ -50,8 +51,17 @@ export default function CentralFinanceiraEntry() {
         if (settingsResult.error) throw settingsResult.error;
 
         const settings = settingsResult.data?.[0] || null;
-        const useSimple = settings?.active !== false && (settings?.control_tier === 'unconfigured' || settings?.control_tier === 'simple' || !settings?.control_start_month);
-        if (!cancelled) setExperience(useSimple ? 'simple' : 'v2');
+        if (settings?.active === false) {
+          if (!cancelled) setExperience('v2');
+          return;
+        }
+
+        const needsOnboarding = !settings || settings.control_tier === 'unconfigured' || !settings.control_start_month;
+        if (!cancelled) {
+          if (needsOnboarding || settings.control_tier === 'simple') setExperience('simple');
+          else if (settings.control_tier === 'basic') setExperience('basic');
+          else setExperience('v2');
+        }
       } catch {
         if (!cancelled) setExperience('v2');
       }
@@ -65,5 +75,7 @@ export default function CentralFinanceiraEntry() {
     return <div style={{minHeight:'100vh',display:'grid',placeItems:'center',fontFamily:'Inter,system-ui,sans-serif',background:'#F6F8FC',color:'#667085'}}>Carregando Central Financeira…</div>;
   }
 
-  return experience === 'simple' ? <SimpleControlAppV2 /> : <CentralFinanceiraV2 />;
+  if (experience === 'simple') return <SimpleControlAppV2 />;
+  if (experience === 'basic') return <BasicControlAppV1 />;
+  return <CentralFinanceiraV2 />;
 }

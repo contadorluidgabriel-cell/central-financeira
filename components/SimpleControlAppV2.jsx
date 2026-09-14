@@ -32,6 +32,7 @@ import {
 import styles from './SimpleControlApp.module.css';
 import SimpleRevenueImport from './SimpleRevenueImport';
 import { generateSimpleRevenuePdf } from '../lib/simple-report-pdf';
+import { BASIC_EXPENSE_MODES, updateBasicSettings } from '../lib/neon-basic-control';
 
 const money = value => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value || 0));
 const percent = value => `${Number(value || 0).toFixed(1).replace('.', ',')}%`;
@@ -163,6 +164,29 @@ export default function SimpleControlAppV2() {
     return () => { cancelled = true; };
   }, [company?.id, company?.pendingRevenueMode, company?.pendingRevenueModeEffective, state?.currentMonth]);
 
+  useEffect(() => {
+    if (!company?.pendingControlTier || !company.pendingControlTierEffective || !state?.currentMonth) return;
+    if (company.pendingControlTierEffective > state.currentMonth) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        await updateBasicSettings(company.id, {
+          controlTier: company.pendingControlTier,
+          expenseEnabled: company.pendingControlTier === 'basic',
+          expenseMode: company.pendingControlTier === 'basic' ? (company.pendingExpenseMode || 'monthly') : 'monthly',
+          pendingControlTier: null,
+          pendingControlTierEffective: null,
+          pendingExpenseMode: null,
+          pendingExpenseModeEffective: null
+        });
+        if (!cancelled) window.location.reload();
+      } catch (e) {
+        if (!cancelled) setError(normalizeSimpleError(e));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [company?.id, company?.pendingControlTier, company?.pendingControlTierEffective, company?.pendingExpenseMode, state?.currentMonth]);
+
   const run = async (action, success) => {
     setBusy(true); setError('');
     try {
@@ -218,11 +242,18 @@ export default function SimpleControlAppV2() {
   const previousPending = previousKey >= startMonth && previousKey < state.currentMonth && !previousSubmission;
 
   if (!company.controlStartMonth) {
-    return <Onboarding company={company} busy={busy} onSave={async ({ mode, startMonth: initialMonth }) => {
-      await run(async () => {
-        await updateSimpleSettings(company.id, { revenueMode: mode, controlTier: 'simple', controlStartMonth: initialMonth });
+    return <Onboarding company={company} busy={busy} onSave={async ({ tier, revenueMode, expenseMode, startMonth: initialMonth }) => {
+      const result = await run(async () => {
+        await updateBasicSettings(company.id, {
+          controlTier: tier,
+          controlStartMonth: initialMonth,
+          revenueMode,
+          expenseEnabled: tier === 'basic',
+          expenseMode: tier === 'basic' ? expenseMode : 'monthly'
+        });
         setMonth(initialMonth);
-      }, 'Controle Simples configurado.');
+      }, tier === 'basic' ? 'Controle Básico configurado.' : 'Controle Simples configurado.');
+      if (result !== null && tier === 'basic') window.location.reload();
     }} onLogout={signOut}/>;
   }
 
@@ -262,7 +293,7 @@ export default function SimpleControlAppV2() {
         {view === 'customers' && currentControlIsIndividual && <Customers customers={customers} allEntries={state.entries.filter(e => e.companyId === company.id)} search={search} setSearch={setSearch} onCreate={() => setModal({ type: 'customer' })} onEdit={customer => setModal({ type: 'customer', customer })} onToggle={customer => run(() => setSimpleCustomerActive(customer.id, !customer.active), customer.active ? 'Cliente inativado.' : 'Cliente reativado.')} onDelete={customer => run(() => deleteUnusedSimpleCustomer(customer.id), 'Cliente excluído.')} onOpen={customer => setModal({ type: 'customerDetail', customer })} onMerge={() => setModal({ type: 'mergeCustomer' })}/>} 
         {view === 'reports' && <Reports mode={periodMode} company={company} month={month} entries={state.entries.filter(e => e.companyId === company.id)}/>} 
         {view === 'closing' && <Closing month={month} currentMonth={state.currentMonth} entries={currentEntries} submission={currentSubmission} status={status} busy={busy} onComplete={noMovement => run(() => completeSimpleMonth({ organizationId: company.id, month, revenueMode: periodMode, noMovement }), 'Mês concluído.')} onReopen={() => setModal({ type: 'reopen' })}/>} 
-        {view === 'settings' && <Settings company={company} categories={categories} paymentMethods={paymentMethods} currentMonth={state.currentMonth} onScheduleMode={mode => run(() => scheduleRevenueMode(company.id, mode, nextMonth(state.currentMonth)), `Mudança programada para ${monthName(nextMonth(state.currentMonth))}.`)} onAddCategory={() => setModal({ type: 'category' })} onEditCategory={category => setModal({ type: 'category', category })} onToggleCategory={category => run(() => setSimpleCategoryActive(category.id, !category.active), category.active ? 'Categoria inativada.' : 'Categoria reativada.')} onAddPayment={() => setModal({ type: 'payment' })} onEditPayment={payment => setModal({ type: 'payment', payment })} onTogglePayment={payment => run(() => setSimplePaymentMethodActive(payment.id, !payment.active), payment.active ? 'Meio de pagamento inativado.' : 'Meio de pagamento reativado.')}/>} 
+        {view === 'settings' && <Settings company={company} categories={categories} paymentMethods={paymentMethods} currentMonth={state.currentMonth} onUpgradeBasic={expenseMode => run(() => updateBasicSettings(company.id, { pendingControlTier: 'basic', pendingControlTierEffective: nextMonth(state.currentMonth), pendingExpenseMode: expenseMode, pendingExpenseModeEffective: nextMonth(state.currentMonth) }), `Controle Básico programado para ${monthName(nextMonth(state.currentMonth))}.`)} onScheduleMode={mode => run(() => scheduleRevenueMode(company.id, mode, nextMonth(state.currentMonth)), `Mudança programada para ${monthName(nextMonth(state.currentMonth))}.`)} onAddCategory={() => setModal({ type: 'category' })} onEditCategory={category => setModal({ type: 'category', category })} onToggleCategory={category => run(() => setSimpleCategoryActive(category.id, !category.active), category.active ? 'Categoria inativada.' : 'Categoria reativada.')} onAddPayment={() => setModal({ type: 'payment' })} onEditPayment={payment => setModal({ type: 'payment', payment })} onTogglePayment={payment => run(() => setSimplePaymentMethodActive(payment.id, !payment.active), payment.active ? 'Meio de pagamento inativado.' : 'Meio de pagamento reativado.')}/>} 
       </div>
     </main>
 
@@ -334,9 +365,40 @@ function Login({ onSubmit, busy, error }) {
 }
 
 function Onboarding({ company, busy, onSave, onLogout }) {
-  const [mode, setMode] = useState(company.revenueMode || 'monthly');
+  const [tier, setTier] = useState('simple');
+  const [revenueMode, setRevenueMode] = useState(company.revenueMode || 'monthly');
+  const [expenseMode, setExpenseMode] = useState('monthly');
   const [startMonth, setStartMonth] = useState(monthKey());
-  return <div className={styles.onboarding}><div className={styles.onboardingCard}><div className={styles.onboardingTop}><div className={styles.brandMark}>LG</div><button onClick={onLogout}>Sair</button></div><span className={styles.eyebrow}>Configuração da sua Central</span><h1>Como você quer controlar sua empresa?</h1><p>A escolha é sua. O contador acompanha a configuração, mas não decide o nível nem o modo por você.</p><div className={styles.infoBox}><strong>Controle Simples</strong><span>Para acompanhar o faturamento sem precisar controlar despesas, contas a pagar, contas a receber ou caixa. Este é o primeiro nível disponível nesta fase.</span></div><p><strong>Como você prefere registrar seu faturamento?</strong> Você poderá mudar este modo depois; a alteração passa a valer no mês seguinte para preservar o histórico.</p><div className={styles.modeGrid}>{SIMPLE_MODES.map(item => <button type="button" className={`${styles.modeCard} ${mode === item ? styles.modeCardActive : ''}`} key={item} onClick={() => setMode(item)}><strong>{modeName(item)}</strong><span>{item === 'monthly' ? 'Informe apenas quanto faturou no mês.' : item === 'daily' ? 'Informe quanto faturou em cada dia.' : 'Registre cada venda ou serviço com detalhes opcionais.'}</span></button>)}</div><div className={styles.onboardingFields}><label>Mês inicial<input type="month" value={startMonth} onChange={e => setStartMonth(e.target.value)}/></label><div className={styles.infoBox}><strong>Como o valor é interpretado</strong><span>Receita aqui significa faturamento bruto da venda ou serviço. O sistema não presume que o dinheiro já foi recebido.</span></div></div><button className={styles.primaryButton} disabled={busy || !startMonth} onClick={() => onSave({ mode, startMonth })}>{busy ? 'Configurando…' : 'Usar Controle Simples'}</button></div></div>;
+  return <div className={styles.onboarding}><div className={styles.onboardingCard}>
+    <div className={styles.onboardingTop}><div className={styles.brandMark}>LG</div><button onClick={onLogout}>Sair</button></div>
+    <span className={styles.eyebrow}>Configuração da sua Central</span>
+    <h1>Como você quer controlar sua empresa?</h1>
+    <p>A escolha é sua. O contador acompanha a configuração, mas não escolhe o nível nem o modo por você. Você pode começar mais simples e evoluir depois.</p>
+
+    <p><strong>1. Escolha o nível de controle</strong></p>
+    <div className={styles.modeGrid}>
+      <button type="button" className={`${styles.modeCard} ${tier === 'simple' ? styles.modeCardActive : ''}`} onClick={() => setTier('simple')}>
+        <strong>Controle Simples</strong><span>Acompanha apenas faturamento. Ideal para quem quer começar sem registrar despesas.</span>
+      </button>
+      <button type="button" className={`${styles.modeCard} ${tier === 'basic' ? styles.modeCardActive : ''}`} onClick={() => setTier('basic')}>
+        <strong>Controle Básico</strong><span>Acompanha faturamento, despesas e resultado gerencial, sem contas a pagar, receber ou caixa.</span>
+      </button>
+    </div>
+
+    <p><strong>2. Como você prefere registrar seu faturamento?</strong> Mudanças futuras passam a valer no mês seguinte para preservar o histórico.</p>
+    <div className={styles.modeGrid}>{SIMPLE_MODES.map(item => <button type="button" className={`${styles.modeCard} ${revenueMode === item ? styles.modeCardActive : ''}`} key={item} onClick={() => setRevenueMode(item)}><strong>{modeName(item)}</strong><span>{item === 'monthly' ? 'Informe apenas quanto faturou no mês.' : item === 'daily' ? 'Informe quanto faturou em cada dia.' : 'Registre cada venda ou serviço com detalhes opcionais.'}</span></button>)}</div>
+
+    {tier === 'basic' && <>
+      <p><strong>3. Como você prefere registrar suas despesas?</strong></p>
+      <div className={styles.modeGrid}>{BASIC_EXPENSE_MODES.map(item => <button type="button" className={`${styles.modeCard} ${expenseMode === item ? styles.modeCardActive : ''}`} key={item} onClick={() => setExpenseMode(item)}><strong>{item === 'monthly' ? 'Total do mês' : 'Cada despesa'}</strong><span>{item === 'monthly' ? 'Informe apenas o total de gastos do mês.' : 'Registre cada gasto com fornecedor, categoria e pagamento opcionais.'}</span></button>)}</div>
+    </>}
+
+    <div className={styles.onboardingFields}>
+      <label>Mês inicial<input type="month" value={startMonth} onChange={e => setStartMonth(e.target.value)}/></label>
+      <div className={styles.infoBox}><strong>Como os valores são interpretados</strong><span>Receita significa faturamento bruto da venda ou serviço. No Básico, despesa significa gasto do negócio referente ao período. A Central não presume recebimento, pagamento ou saldo bancário.</span></div>
+    </div>
+    <button className={styles.primaryButton} disabled={busy || !startMonth} onClick={() => onSave({ tier, revenueMode, expenseMode, startMonth })}>{busy ? 'Configurando…' : tier === 'basic' ? 'Usar Controle Básico' : 'Usar Controle Simples'}</button>
+  </div></div>;
 }
 
 function NavButton({ active, icon, label, onClick }) {
@@ -495,10 +557,12 @@ function Closing({ month, currentMonth, entries, submission, status, busy, onCom
   return <><PageHeader title="Fechamento do mês" description="Concluir significa que você terminou de informar e conferiu o período."/><div className={styles.closingGrid}><section className={styles.panel}><div className={styles.panelHead}><div><h3>{monthName(month)}</h3><p>Status: {status}</p></div><span className={styles.bigStatus}>{submission?.revenueNoMovement && submission?.status === 'confirmed' ? 'Concluído · Sem movimento' : status}</span></div><div className={styles.summaryRows}><div><span>Faturamento bruto</span><b>{money(gross)}</b></div><div><span>Ajustes positivos</span><b>{money(positive)}</b></div><div><span>Estornos / ajustes negativos</span><b>{money(negative)}</b></div><div className={styles.summaryTotal}><span>Faturamento após ajustes</span><b>{money(net)}</b></div></div></section><section className={styles.panel}><div className={styles.panelHead}><div><h3>Conferência</h3><p>O mês fica bloqueado depois da conclusão.</p></div></div><div className={styles.closingBody}>{submission?.status === 'confirmed' ? <><div className={styles.infoBox}><strong>Mês concluído</strong><span>{submission.revenueNoMovement ? 'Este período foi concluído como sem movimento.' : `Concluído em ${submission.confirmed_at ? new Date(submission.confirmed_at).toLocaleString('pt-BR') : 'data não informada'}.`}</span></div><button className={styles.secondaryButton} onClick={onReopen} disabled={busy}><Icon name="refresh"/>Reabrir mês</button></> : <><label className={`${styles.checkCard} ${hasMovement ? styles.checkDisabled : ''}`}><input type="checkbox" checked={noMovement} disabled={hasMovement} onChange={e => setNoMovement(e.target.checked)}/><div><strong>Sem movimento neste mês</strong><span>{hasMovement ? 'Remova os lançamentos antes de marcar sem movimento.' : 'Use quando o mês foi conferido e não houve faturamento.'}</span></div></label>{currentMonthWarning && <div className={styles.infoBox}><strong>O mês ainda está em andamento</strong><span>Você pode concluir como sem movimento, mas confirme se realmente não haverá mais faturamento neste período.</span></div>}{!hasMovement && !noMovement && <div className={styles.formError}>Registre uma receita ou marque o mês como sem movimento antes de concluir.</div>}<button className={styles.primaryButton} disabled={busy || (!hasMovement && !noMovement)} onClick={() => onComplete(noMovement)}><Icon name="check"/>{busy ? 'Concluindo…' : 'Concluir mês'}</button></>}</div></section></div>{submission?.status === 'reopened' && <div className={styles.historyNote}><strong>Este mês foi reaberto.</strong><span>Motivo: {submission.reopen_reason || 'Não informado'} · Reaberturas: {submission.reopenCount || 1}</span></div>}</>;
 }
 
-function Settings({ company, categories, paymentMethods, currentMonth, onScheduleMode, onAddCategory, onEditCategory, onToggleCategory, onAddPayment, onEditPayment, onTogglePayment }) {
+function Settings({ company, categories, paymentMethods, currentMonth, onUpgradeBasic, onScheduleMode, onAddCategory, onEditCategory, onToggleCategory, onAddPayment, onEditPayment, onTogglePayment }) {
   const [mode, setMode] = useState(company.pendingRevenueMode || company.revenueMode);
+  const [basicExpenseMode, setBasicExpenseMode] = useState(company.pendingExpenseMode || 'monthly');
   useEffect(() => setMode(company.pendingRevenueMode || company.revenueMode), [company.pendingRevenueMode, company.revenueMode]);
-  return <><PageHeader title="Configurações" description="Ajuste como o Controle Simples organiza seu faturamento."/><div className={styles.settingsGrid}><section className={styles.panel}><div className={styles.panelHead}><div><h3>Modo de lançamento</h3><p>A mudança vale a partir do próximo mês e não reinterpreta o histórico.</p></div></div><div className={styles.settingsBody}><select value={mode} onChange={e => setMode(e.target.value)}>{SIMPLE_MODES.map(item => <option key={item} value={item}>{modeName(item)}</option>)}</select><button className={styles.secondaryButton} disabled={mode === (company.pendingRevenueMode || company.revenueMode)} onClick={() => onScheduleMode(mode)}>Programar mudança</button>{company.pendingRevenueMode && <div className={styles.infoBox}><strong>Mudança programada</strong><span>{modeName(company.pendingRevenueMode)} a partir de {monthName(company.pendingRevenueModeEffective)}. Até {monthName(currentMonth)}, o modo atual continua sendo {modeName(company.revenueMode)}.</span></div>}</div></section><CatalogPanel title="Categorias" items={categories} onAdd={onAddCategory} onEdit={onEditCategory} onToggle={onToggleCategory}/><CatalogPanel title="Meios de pagamento" items={paymentMethods} onAdd={onAddPayment} onEdit={onEditPayment} onToggle={onTogglePayment}/></div></>;
+  useEffect(() => setBasicExpenseMode(company.pendingExpenseMode || 'monthly'), [company.pendingExpenseMode]);
+  return <><PageHeader title="Configurações" description="Ajuste como o Controle Simples organiza seu faturamento."/><div className={styles.settingsGrid}><section className={styles.panel}><div className={styles.panelHead}><div><h3>Nível de controle</h3><p>Você decide quando quer passar a acompanhar também as despesas.</p></div></div><div className={styles.settingsBody}><div className={styles.infoBox}><strong>Controle Simples</strong><span>Hoje você acompanha somente o faturamento. O Controle Básico acrescenta despesas e resultado gerencial, sem contas a pagar, receber ou caixa.</span></div>{!company.pendingControlTier && <label>Como você quer registrar as despesas?<select value={basicExpenseMode} onChange={e => setBasicExpenseMode(e.target.value)}>{BASIC_EXPENSE_MODES.map(item => <option key={item} value={item}>{item === 'monthly' ? 'Total do mês' : 'Cada despesa'}</option>)}</select></label>}<button className={styles.primaryButton} disabled={Boolean(company.pendingControlTier)} onClick={() => onUpgradeBasic(basicExpenseMode)}>{company.pendingControlTier === 'basic' ? `Controle Básico programado para ${monthName(company.pendingControlTierEffective)} · despesas: ${company.pendingExpenseMode === 'individual' ? 'Cada despesa' : 'Total do mês'}` : 'Usar Controle Básico no próximo mês'}</button></div></section><section className={styles.panel}><div className={styles.panelHead}><div><h3>Modo de lançamento</h3><p>A mudança vale a partir do próximo mês e não reinterpreta o histórico.</p></div></div><div className={styles.settingsBody}><select value={mode} onChange={e => setMode(e.target.value)}>{SIMPLE_MODES.map(item => <option key={item} value={item}>{modeName(item)}</option>)}</select><button className={styles.secondaryButton} disabled={mode === (company.pendingRevenueMode || company.revenueMode)} onClick={() => onScheduleMode(mode)}>Programar mudança</button>{company.pendingRevenueMode && <div className={styles.infoBox}><strong>Mudança programada</strong><span>{modeName(company.pendingRevenueMode)} a partir de {monthName(company.pendingRevenueModeEffective)}. Até {monthName(currentMonth)}, o modo atual continua sendo {modeName(company.revenueMode)}.</span></div>}</div></section><CatalogPanel title="Categorias" items={categories} onAdd={onAddCategory} onEdit={onEditCategory} onToggle={onToggleCategory}/><CatalogPanel title="Meios de pagamento" items={paymentMethods} onAdd={onAddPayment} onEdit={onEditPayment} onToggle={onTogglePayment}/></div></>;
 }
 
 function CatalogPanel({ title, items, onAdd, onEdit, onToggle }) {
