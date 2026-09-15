@@ -60,6 +60,30 @@ Ledger de caixa gerado somente pelas RPCs. Não aceita escrita direta do usuári
 
 Transferência entre contas gera uma saída e uma entrada de mesmo valor. Não é receita nem despesa.
 
+## Fluxo de caixa acumulado
+
+O Controle Completo recalcula o saldo após cada evento do período:
+
+`saldo acumulado anterior + entrada - saída`.
+
+No consolidado de **Todas as contas**:
+
+- parte do saldo existente no início do período;
+- incorpora saldos iniciais de contas abertas dentro do mês;
+- incorpora recebimentos e pagamentos realizados;
+- incorpora contas a receber/pagar ainda abertas como projeção;
+- mostra transferências internas, mas elas têm efeito líquido zero no saldo consolidado;
+- calcula o menor saldo do período;
+- identifica o primeiro ponto em que o saldo projetado fica negativo.
+
+Quando uma conta específica é filtrada:
+
+- o acumulado considera somente os movimentos realizados naquela conta;
+- transferências passam a afetar o saldo da conta de origem/destino;
+- obrigações futuras continuam visíveis nos totais da empresa, mas não são somadas ao saldo daquela conta porque ainda não possuem conta de liquidação definida.
+
+Para mês futuro, obrigações abertas com vencimento anterior ao mês selecionado são consideradas no saldo projetado de abertura. No mês atual, obrigações vencidas de meses anteriores entram como risco projetado na data atual.
+
 ## Atomicidade
 
 Operações críticas devem acontecer em uma única transação PostgreSQL.
