@@ -6,7 +6,7 @@ import { completeFirstPasswordChange, touchClientLogin } from '../lib/client-acc
 import CentralFinanceiraV2 from './CentralFinanceiraV2';
 import SimpleControlAppV2 from './SimpleControlAppV2';
 import BasicControlAppV1 from './BasicControlAppV1';
-import CompleteControlAppV1 from './CompleteControlAppV1';
+import CompleteControlAppV2 from './CompleteControlAppV2';
 import ControlTierOnboarding from './ControlTierOnboarding';
 
 function PasswordChangeGate({ email }) {
@@ -176,6 +176,6 @@ export default function CentralFinanceiraEntry() {
   if (experience === 'onboarding') return <ControlTierOnboarding />;
   if (experience === 'simple') return <SimpleControlAppV2 />;
   if (experience === 'basic') return <BasicControlAppV1 />;
-  if (experience === 'complete') return <CompleteControlAppV1 />;
+  if (experience === 'complete') return <CompleteControlAppV2 />;
   return <CentralFinanceiraV2 />;
 }
