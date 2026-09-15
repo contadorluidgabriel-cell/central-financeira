@@ -50,15 +50,15 @@ Exibe cada movimento em ordem cronológica com entrada, saída e saldo após o m
 
 `finance_installment_plans_v2` agrupa parcelas. Cada parcela é uma obrigação real em `finance_obligations`.
 
-Exemplo: R$ 1.000 em 3x gera R$ 333,34 + R$ 333,33 + R$ 333,33.
+Exemplo validado em QA: R$ 1.000 em 3x gerou R$ 333,34 + R$ 333,33 + R$ 333,33.
 
-Cada parcela pode usar o motor normal de baixa, atraso, edição segura e estorno. O saldo restante do parcelamento pode ser cancelado sem apagar baixas já realizadas.
+Cada parcela usa o motor normal de baixa, atraso, edição segura e estorno. O saldo restante do parcelamento pode ser cancelado sem apagar baixas já realizadas.
 
 ### Recorrências
 
 `finance_recurring_rules_v2` define receitas/despesas mensais e gera obrigações normais. Vencimentos em dia 29/30/31 são ajustados automaticamente ao último dia de meses curtos.
 
-A geração possui lock transacional e proteção contra duplicidade. Uma recorrência pode ser estendida por novos meses ou encerrada, com opção de cancelar obrigações futuras ainda abertas.
+QA validou recorrência no dia 31 em meses de 30 dias e em fevereiro. A geração possui lock transacional e proteção contra duplicidade; repetir o mesmo horizonte gera zero novas ocorrências. Uma recorrência pode ser estendida por novos meses ou encerrada, com opção de cancelar obrigações futuras ainda abertas.
 
 ## Fluxo de caixa acumulado
 
@@ -71,6 +71,17 @@ O saldo é recalculado depois de cada evento. No consolidado de todas as contas,
 - operações compostas passam por RPCs `SECURITY DEFINER` com validação de organização;
 - FKs compostas impedem referências cruzadas entre empresas;
 - histórico e estornos são preservados; registros financeiros não são apagados pelo fluxo normal.
+
+## QA V3/V4
+
+- edição gera trilha antes/depois + motivo;
+- redução do valor abaixo do total já baixado é rejeitada;
+- parcelamento preserva centavos e cria obrigações independentes;
+- cancelamento do saldo restante preserva valores já liquidados;
+- recorrência dia 31 ajusta meses curtos corretamente;
+- geração repetida não duplica ocorrências;
+- encerramento pode cancelar obrigações futuras abertas;
+- DML direto nas tabelas V3/V4 permanece bloqueado para `authenticated`.
 
 ## Ainda fora do escopo
 
