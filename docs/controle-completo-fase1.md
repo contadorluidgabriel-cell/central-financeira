@@ -74,7 +74,8 @@ No consolidado de **Todas as contas**:
 - incorpora contas a receber/pagar ainda abertas como projeção;
 - mostra transferências internas, mas elas têm efeito líquido zero no saldo consolidado;
 - calcula o menor saldo do período;
-- identifica o primeiro ponto em que o saldo projetado fica negativo.
+- identifica o primeiro ponto em que o saldo projetado fica negativo;
+- mostra o saldo acumulado após cada linha da linha do caixa.
 
 Quando uma conta específica é filtrada:
 
@@ -83,6 +84,8 @@ Quando uma conta específica é filtrada:
 - obrigações futuras continuam visíveis nos totais da empresa, mas não são somadas ao saldo daquela conta porque ainda não possuem conta de liquidação definida.
 
 Para mês futuro, obrigações abertas com vencimento anterior ao mês selecionado são consideradas no saldo projetado de abertura. No mês atual, obrigações vencidas de meses anteriores entram como risco projetado na data atual.
+
+A interface destaca o primeiro evento que leva o saldo abaixo de zero e apresenta o menor saldo projetado/realizado do período.
 
 ## Atomicidade
 
