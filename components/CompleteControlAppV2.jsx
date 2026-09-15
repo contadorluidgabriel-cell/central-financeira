@@ -18,6 +18,16 @@ const monthKey = date => String(date || '').slice(0, 7);
 const monthNow = () => localToday().slice(0, 7);
 const isTransferKind = kind => String(kind || '').startsWith('transfer_');
 const directionLabel = direction => direction === 'in' ? 'Entrada' : 'Saída';
+const signedAmount = (direction, amount) => direction === 'in' ? Number(amount || 0) : -Number(amount || 0);
+
+function monthBounds(month) {
+  const [year, monthNumber] = String(month).split('-').map(Number);
+  const lastDay = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
+  return {
+    start: `${month}-01`,
+    end: `${month}-${String(lastDay).padStart(2, '0')}`
+  };
+}
 
 function Icon({ name }) {
   const paths = {
@@ -134,7 +144,7 @@ function FinanceWorkspace({ workspace, setWorkspace, data, loading, error, onRef
       <header className={styles.workspaceHeader}>
         <div className={styles.headerLeft}>
           <button className={styles.iconButton} onClick={onClose} title="Voltar ao Controle Completo"><Icon name="back"/></button>
-          <div><span>Controle Completo</span><h1>{workspace === 'cashflow' ? 'Fluxo de caixa' : 'Histórico financeiro'}</h1><p>{workspace === 'cashflow' ? 'Dinheiro realizado e compromissos projetados, sem confundir transferência com receita ou despesa.' : 'Baixas e transferências com trilha de auditoria e estorno compensatório.'}</p></div>
+          <div><span>Controle Completo</span><h1>{workspace === 'cashflow' ? 'Fluxo de caixa' : 'Histórico financeiro'}</h1><p>{workspace === 'cashflow' ? 'Dinheiro realizado e compromissos projetados, com saldo acumulado após cada movimento.' : 'Baixas e transferências com trilha de auditoria e estorno compensatório.'}</p></div>
         </div>
         <div className={styles.workspaceActions}>
           <div className={styles.switcher}><button className={workspace === 'cashflow' ? styles.selected : ''} onClick={() => setWorkspace('cashflow')}><Icon name="cash"/>Fluxo</button><button className={workspace === 'history' ? styles.selected : ''} onClick={() => setWorkspace('history')}><Icon name="history"/>Histórico</button></div>
@@ -154,81 +164,179 @@ function FinanceWorkspace({ workspace, setWorkspace, data, loading, error, onRef
 function CashFlowView({ accounts, obligations, movements, transfers }) {
   const [month, setMonth] = useState(monthNow());
   const [accountId, setAccountId] = useState('all');
-  const currentBalance = accounts.filter(item => item.active).reduce((sum, item) => sum + item.balance, 0);
+  const bounds = useMemo(() => monthBounds(month), [month]);
+  const allAccountsSelected = accountId === 'all';
+  const selectedAccount = accounts.find(item => item.id === accountId) || null;
+  const scopeAccounts = useMemo(() => allAccountsSelected ? accounts : accounts.filter(item => item.id === accountId), [accounts, accountId, allAccountsSelected]);
+  const scopeAccountIds = useMemo(() => new Set(scopeAccounts.map(item => item.id)), [scopeAccounts]);
 
-  const monthMovements = useMemo(() => movements.filter(item => monthKey(item.date) === month && (accountId === 'all' || item.accountId === accountId)), [movements, month, accountId]);
-  const businessMovements = useMemo(() => monthMovements.filter(item => !isTransferKind(item.kind)), [monthMovements]);
-  const projected = useMemo(() => obligations.filter(item => ['open','partial'].includes(item.status) && monthKey(item.dueDate) === month), [obligations, month]);
-  const monthTransfers = useMemo(() => transfers.filter(item => monthKey(item.date) === month), [transfers, month]);
+  const currentBalance = allAccountsSelected
+    ? accounts.reduce((sum, item) => sum + item.balance, 0)
+    : Number(selectedAccount?.balance || 0);
 
-  const realizedIn = businessMovements.filter(item => item.direction === 'in').reduce((sum, item) => sum + item.amount, 0);
-  const realizedOut = businessMovements.filter(item => item.direction === 'out').reduce((sum, item) => sum + item.amount, 0);
-  const projectedIn = projected.filter(item => item.direction === 'receivable').reduce((sum, item) => sum + item.remaining, 0);
-  const projectedOut = projected.filter(item => item.direction === 'payable').reduce((sum, item) => sum + item.remaining, 0);
+  const periodOpeningBalance = useMemo(() => {
+    const accountOpening = scopeAccounts.reduce((sum, account) => {
+      const openingDate = String(account.openingDate || '').slice(0, 10);
+      return sum + (openingDate && openingDate < bounds.start ? Number(account.openingBalance || 0) : 0);
+    }, 0);
+    const previousMovements = movements
+      .filter(item => scopeAccountIds.has(item.accountId) && String(item.date).slice(0, 10) < bounds.start)
+      .reduce((sum, item) => sum + signedAmount(item.direction, item.amount), 0);
+    return accountOpening + previousMovements;
+  }, [scopeAccounts, scopeAccountIds, movements, bounds.start]);
+
+  const monthScopeMovements = useMemo(() => movements.filter(item => {
+    const date = String(item.date).slice(0, 10);
+    return date >= bounds.start && date <= bounds.end && scopeAccountIds.has(item.accountId);
+  }), [movements, bounds.start, bounds.end, scopeAccountIds]);
+
+  const realizedMovements = useMemo(() => allAccountsSelected
+    ? monthScopeMovements.filter(item => !isTransferKind(item.kind))
+    : monthScopeMovements,
+  [monthScopeMovements, allAccountsSelected]);
+
+  const projected = useMemo(() => obligations.filter(item => {
+    const dueDate = String(item.dueDate || '').slice(0, 10);
+    return ['open','partial'].includes(item.status) && dueDate >= bounds.start && dueDate <= bounds.end;
+  }), [obligations, bounds.start, bounds.end]);
+
+  const overdueCarry = useMemo(() => {
+    if (!allAccountsSelected || month !== monthNow()) return [];
+    return obligations.filter(item => ['open','partial'].includes(item.status) && String(item.dueDate || '').slice(0, 10) < bounds.start);
+  }, [obligations, allAccountsSelected, month, bounds.start]);
+
+  const futurePriorOpenNet = useMemo(() => {
+    if (!allAccountsSelected || month <= monthNow()) return 0;
+    return obligations
+      .filter(item => ['open','partial'].includes(item.status) && String(item.dueDate || '').slice(0, 10) < bounds.start)
+      .reduce((sum, item) => sum + (item.direction === 'receivable' ? item.remaining : -item.remaining), 0);
+  }, [obligations, allAccountsSelected, month, bounds.start]);
+
+  const monthTransfers = useMemo(() => transfers.filter(item => {
+    const date = String(item.date).slice(0, 10);
+    return date >= bounds.start && date <= bounds.end;
+  }), [transfers, bounds.start, bounds.end]);
+
+  const realizedIn = realizedMovements.filter(item => item.direction === 'in').reduce((sum, item) => sum + item.amount, 0);
+  const realizedOut = realizedMovements.filter(item => item.direction === 'out').reduce((sum, item) => sum + item.amount, 0);
+  const projectedBase = [...projected, ...overdueCarry];
+  const projectedIn = projectedBase.filter(item => item.direction === 'receivable').reduce((sum, item) => sum + item.remaining, 0);
+  const projectedOut = projectedBase.filter(item => item.direction === 'payable').reduce((sum, item) => sum + item.remaining, 0);
   const projectedNet = projectedIn - projectedOut;
   const realizedNet = realizedIn - realizedOut;
+  const accumulationStart = periodOpeningBalance + futurePriorOpenNet;
 
   const timeline = useMemo(() => {
-    const realizedRows = businessMovements.map(item => ({
+    const openingRows = scopeAccounts
+      .filter(account => {
+        const openingDate = String(account.openingDate || '').slice(0, 10);
+        return openingDate >= bounds.start && openingDate <= bounds.end && Number(account.openingBalance || 0) !== 0;
+      })
+      .map(account => ({
+        id: `opening-${account.id}`,
+        date: String(account.openingDate).slice(0, 10),
+        state: 'opening',
+        direction: Number(account.openingBalance) >= 0 ? 'in' : 'out',
+        description: `Saldo inicial • ${account.name}`,
+        amount: Math.abs(Number(account.openingBalance || 0)),
+        effect: Number(account.openingBalance || 0),
+        detail: 'Ponto de partida da conta'
+      }));
+
+    const realizedRows = realizedMovements.map(item => ({
       id: `m-${item.id}`,
       date: item.date,
-      state: 'realized',
+      state: isTransferKind(item.kind) ? 'transfer' : 'realized',
       direction: item.direction,
       description: item.description || directionLabel(item.direction),
       amount: item.amount,
-      detail: accountName(accounts, item.accountId)
+      effect: signedAmount(item.direction, item.amount),
+      detail: isTransferKind(item.kind) ? `${accountName(accounts, item.accountId)} • ${directionLabel(item.direction)}` : accountName(accounts, item.accountId)
     }));
-    const projectedRows = projected.map(item => ({
+
+    const projectedRows = allAccountsSelected ? projected.map(item => ({
       id: `o-${item.id}`,
       date: item.dueDate,
       state: 'projected',
       direction: item.direction === 'receivable' ? 'in' : 'out',
       description: item.description,
       amount: item.remaining,
+      effect: item.direction === 'receivable' ? item.remaining : -item.remaining,
       detail: item.overdue ? 'Vencido' : 'Previsto'
-    }));
-    const transferRows = accountId === 'all' ? monthTransfers.map(item => ({
+    })) : [];
+
+    const overdueRows = allAccountsSelected ? overdueCarry.map(item => ({
+      id: `overdue-${item.id}`,
+      date: localToday(),
+      state: 'projected',
+      direction: item.direction === 'receivable' ? 'in' : 'out',
+      description: item.description,
+      amount: item.remaining,
+      effect: item.direction === 'receivable' ? item.remaining : -item.remaining,
+      detail: `Vencido desde ${dateBR(item.dueDate)}`
+    })) : [];
+
+    const transferRows = allAccountsSelected ? monthTransfers.map(item => ({
       id: `t-${item.id}`,
       date: item.date,
       state: 'transfer',
       direction: 'transfer',
       description: item.description || 'Transferência entre contas',
       amount: item.amount,
+      effect: 0,
       detail: `${accountName(accounts, item.fromAccountId)} → ${accountName(accounts, item.toAccountId)}`
-    })) : monthMovements.filter(item => isTransferKind(item.kind)).map(item => ({
-      id: `tm-${item.id}`,
-      date: item.date,
-      state: 'transfer',
-      direction: item.direction,
-      description: item.description || 'Transferência',
-      amount: item.amount,
-      detail: directionLabel(item.direction)
-    }));
-    return [...realizedRows, ...projectedRows, ...transferRows].sort((a,b) => String(a.date).localeCompare(String(b.date)) || a.state.localeCompare(b.state));
-  }, [businessMovements, projected, monthTransfers, monthMovements, accountId, accounts]);
+    })) : [];
+
+    const rank = { opening: 0, realized: 1, transfer: 2, projected: 3 };
+    const rows = [...openingRows, ...realizedRows, ...projectedRows, ...overdueRows, ...transferRows]
+      .sort((a,b) => String(a.date).localeCompare(String(b.date)) || (rank[a.state] ?? 9) - (rank[b.state] ?? 9) || String(a.id).localeCompare(String(b.id)));
+
+    let running = accumulationStart;
+    return rows.map(item => {
+      running += Number(item.effect || 0);
+      return { ...item, accumulatedBalance: running };
+    });
+  }, [scopeAccounts, bounds.start, bounds.end, realizedMovements, projected, overdueCarry, monthTransfers, allAccountsSelected, accounts, accumulationStart]);
+
+  const finalAccumulatedBalance = timeline.length ? timeline[timeline.length - 1].accumulatedBalance : accumulationStart;
+  const minimumPoint = useMemo(() => {
+    let minimum = { balance: accumulationStart, date: bounds.start, label: 'Início do período' };
+    for (const item of timeline) {
+      if (item.accumulatedBalance < minimum.balance) {
+        minimum = { balance: item.accumulatedBalance, date: item.date, label: item.description };
+      }
+    }
+    return minimum;
+  }, [timeline, accumulationStart, bounds.start]);
+  const riskPoint = timeline.find(item => item.accumulatedBalance < 0) || (accumulationStart < 0 ? { date: bounds.start, description: 'Início do período' } : null);
 
   return <div className={styles.content}>
     <div className={styles.filters}>
       <label><span>Período</span><input type="month" value={month} onChange={e => setMonth(e.target.value)}/></label>
       <label><span>Conta para realizados</span><select value={accountId} onChange={e => setAccountId(e.target.value)}><option value="all">Todas as contas</option>{accounts.filter(item => item.active).map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-      <div className={styles.filterNote}>A projeção considera todas as contas, porque um compromisso ainda não possui conta de liquidação definida.</div>
+      <div className={styles.filterNote}>{allAccountsSelected ? 'O acumulado combina caixa realizado e obrigações previstas. Transferências entre contas não alteram o saldo total da empresa.' : 'Ao filtrar uma conta, o acumulado mostra somente o saldo realizado dela. A projeção continua nos totais da empresa porque a obrigação ainda não tem conta de liquidação definida.'}</div>
     </div>
 
     <section className={styles.metrics}>
-      <Metric label="Saldo atual" value={money(currentBalance)} detail={`${accounts.filter(item => item.active).length} contas ativas`}/>
-      <Metric label="Resultado de caixa realizado" value={money(realizedNet)} detail={`${money(realizedIn)} entrou • ${money(realizedOut)} saiu`} tone={realizedNet < 0 ? 'danger' : 'success'}/>
-      <Metric label="Entradas projetadas" value={money(projectedIn)} detail="Saldo aberto com vencimento no mês"/>
-      <Metric label="Saídas projetadas" value={money(projectedOut)} detail={`Projeção líquida: ${money(projectedNet)}`} tone={projectedNet < 0 ? 'danger' : 'neutral'}/>
+      <Metric label={allAccountsSelected ? 'Saldo atual' : `Saldo atual • ${selectedAccount?.name || 'Conta'}`} value={money(currentBalance)} detail={allAccountsSelected ? `${accounts.filter(item => item.active).length} contas ativas` : 'Saldo real desta conta'}/>
+      <Metric label={allAccountsSelected ? 'Resultado de caixa realizado' : 'Variação realizada da conta'} value={money(realizedNet)} detail={`${money(realizedIn)} entrou • ${money(realizedOut)} saiu`} tone={realizedNet < 0 ? 'danger' : 'success'}/>
+      <Metric label="Entradas projetadas" value={money(projectedIn)} detail={allAccountsSelected ? 'Em aberto com impacto no período' : 'Total da empresa; não aplicado ao saldo desta conta'}/>
+      <Metric label="Saídas projetadas" value={money(projectedOut)} detail={`Projeção líquida da empresa: ${money(projectedNet)}`} tone={projectedNet < 0 ? 'danger' : 'neutral'}/>
     </section>
 
-    <section className={styles.cashSummary}>
-      <div><small>Leitura do período</small><strong>{money(realizedNet + projectedNet)}</strong><span>realizado + compromissos ainda abertos no mês</span></div>
-      <div className={styles.legend}><span><i className={styles.realizedDot}></i>Realizado</span><span><i className={styles.projectedDot}></i>Projetado</span><span><i className={styles.transferDot}></i>Transferência interna</span></div>
+    <section className={`${styles.cashSummary} ${riskPoint && allAccountsSelected ? styles.cashSummaryRisk : ''}`}>
+      <div className={styles.cashSummaryValues}>
+        <div><small>{allAccountsSelected ? 'Saldo projetado no fim do período' : 'Saldo realizado acumulado no fim do período'}</small><strong>{money(finalAccumulatedBalance)}</strong><span>abertura do período: {money(accumulationStart)}</span></div>
+        <div><small>{allAccountsSelected ? 'Menor saldo projetado' : 'Menor saldo realizado'}</small><strong>{money(minimumPoint.balance)}</strong><span>{minimumPoint.label} • {dateBR(minimumPoint.date)}</span></div>
+      </div>
+      {riskPoint && allAccountsSelected && <div className={styles.riskAlert}><strong>Risco de caixa em {dateBR(riskPoint.date)}</strong><span>O saldo acumulado fica negativo após “{riskPoint.description}”.</span></div>}
+      {!allAccountsSelected && <div className={styles.accountProjectionNote}>A projeção de receber/pagar não é somada ao acumulado da conta filtrada até a conta de liquidação ser definida.</div>}
+      <div className={styles.legend}><span><i className={styles.openingDot}></i>Saldo inicial</span><span><i className={styles.realizedDot}></i>Realizado</span>{allAccountsSelected && <span><i className={styles.projectedDot}></i>Projetado</span>}<span><i className={styles.transferDot}></i>Transferência interna</span></div>
     </section>
 
     <section className={styles.tablePanel}>
-      <header><div><h2>Linha do caixa</h2><p>Transferências aparecem no histórico, mas não compõem entrada/saída do negócio quando todas as contas estão selecionadas.</p></div></header>
-      {timeline.length ? <div className={styles.tableWrap}><table><thead><tr><th>Data</th><th>Situação</th><th>Descrição</th><th>Detalhe</th><th>Valor</th></tr></thead><tbody>{timeline.map(item => <tr key={item.id}><td>{dateBR(item.date)}</td><td><span className={`${styles.badge} ${item.state === 'projected' ? styles.badgeProjected : item.state === 'transfer' ? styles.badgeTransfer : styles.badgeRealized}`}>{item.state === 'projected' ? 'Projetado' : item.state === 'transfer' ? 'Transferência' : 'Realizado'}</span></td><td><strong>{item.description}</strong></td><td>{item.detail}</td><td className={item.direction === 'out' ? styles.amountOut : item.direction === 'in' ? styles.amountIn : ''}>{item.direction === 'out' ? '− ' : item.direction === 'in' ? '+ ' : ''}{money(item.amount)}</td></tr>)}</tbody></table></div> : <Empty title="Sem movimentos no período" text="Não há caixa realizado, compromissos previstos ou transferências para o mês selecionado."/>}
+      <header><div><h2>Linha do caixa acumulada</h2><p>{allAccountsSelected ? 'Cada linha recalcula o saldo da empresa. Transferências ficam visíveis, mas têm efeito líquido zero no consolidado.' : 'Cada entrada, saída ou transferência recalcula o saldo desta conta. Compromissos futuros permanecem fora do acumulado até terem uma conta definida.'}</p></div></header>
+      {timeline.length ? <div className={styles.tableWrap}><table><thead><tr><th>Data</th><th>Situação</th><th>Descrição</th><th>Detalhe</th><th>Valor</th><th>Saldo acumulado</th></tr></thead><tbody>{timeline.map(item => <tr key={item.id}><td>{dateBR(item.date)}</td><td><span className={`${styles.badge} ${item.state === 'projected' ? styles.badgeProjected : item.state === 'transfer' ? styles.badgeTransfer : item.state === 'opening' ? styles.badgeOpening : styles.badgeRealized}`}>{item.state === 'projected' ? 'Projetado' : item.state === 'transfer' ? 'Transferência' : item.state === 'opening' ? 'Saldo inicial' : 'Realizado'}</span></td><td><strong>{item.description}</strong></td><td>{item.detail}</td><td className={item.direction === 'out' ? styles.amountOut : item.direction === 'in' ? styles.amountIn : ''}>{item.direction === 'out' ? '− ' : item.direction === 'in' ? '+ ' : ''}{money(item.amount)}</td><td className={`${styles.balanceCell} ${item.accumulatedBalance < 0 ? styles.balanceNegative : ''}`}>{money(item.accumulatedBalance)}</td></tr>)}</tbody></table></div> : <Empty title="Sem movimentos no período" text={`Saldo de abertura do período: ${money(accumulationStart)}.`}/>} 
     </section>
   </div>;
 }
