@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { neonTest } from '../lib/neon-test-client';
 import { bootstrapBasicOrganization } from '../lib/neon-basic-control';
+import BasicControlAppV1 from './BasicControlAppV1';
 import {
   cancelCompleteObligation,
   createCompleteAccount,
@@ -23,6 +24,7 @@ const statusLabel = value => ({ open: 'Em aberto', partial: 'Parcial', settled: 
 function Icon({ name }) {
   const paths = {
     home: <><path d="M3 11 12 3l9 8"/><path d="M5 10v11h14V10"/></>,
+    chart: <><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></>,
     wallet: <><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M16 10h5v4h-5a2 2 0 0 1 0-4Z"/></>,
     in: <><path d="M12 3v14"/><path d="m7 12 5 5 5-5"/><path d="M5 21h14"/></>,
     out: <><path d="M12 21V7"/><path d="m7 12 5-5 5 5"/><path d="M5 3h14"/></>,
@@ -80,13 +82,16 @@ export default function CompleteControlAppV1() {
     (async () => {
       try {
         await bootstrapBasicOrganization(company.id);
-        if (!cancelled) setBootstrapped(prev => ({ ...prev, [company.id]: true }));
+        if (!cancelled) {
+          setBootstrapped(prev => ({ ...prev, [company.id]: true }));
+          await refresh();
+        }
       } catch (err) {
         if (!cancelled) setError(normalizeCompleteError(err));
       }
     })();
     return () => { cancelled = true; };
-  }, [company?.id]);
+  }, [company?.id, refresh]);
 
   const accounts = useMemo(() => state?.accounts.filter(item => item.companyId === selectedCompanyId) || [], [state, selectedCompanyId]);
   const obligations = useMemo(() => state?.obligations.filter(item => item.companyId === selectedCompanyId) || [], [state, selectedCompanyId]);
@@ -128,6 +133,16 @@ export default function CompleteControlAppV1() {
   if (session.isPending || !state) return <Center text="Carregando Controle Completo…"/>;
   if (!company) return <Center text="Nenhuma empresa disponível para este acesso."/>;
 
+  if (view === 'competency') {
+    return <div className={styles.competencyBridge}>
+      <BasicControlAppV1 />
+      <button className={styles.backToFinance} onClick={() => { setView('overview'); refresh(); }}>
+        <Icon name="wallet"/>
+        Voltar ao financeiro
+      </button>
+    </div>;
+  }
+
   const visibleObligations = view === 'receivables'
     ? obligations.filter(item => item.direction === 'receivable')
     : view === 'payables'
@@ -139,6 +154,7 @@ export default function CompleteControlAppV1() {
       <div className={styles.brand}><span>LG</span><div><strong>Central Financeira</strong><small>Controle Completo</small></div></div>
       <nav className={styles.nav}>
         <button className={view === 'overview' ? styles.active : ''} onClick={() => setView('overview')}><Icon name="home"/>Visão geral</button>
+        <button onClick={() => setView('competency')}><Icon name="chart"/>Competência</button>
         <button className={view === 'accounts' ? styles.active : ''} onClick={() => setView('accounts')}><Icon name="wallet"/>Contas</button>
         <button className={view === 'receivables' ? styles.active : ''} onClick={() => setView('receivables')}><Icon name="in"/>A receber</button>
         <button className={view === 'payables' ? styles.active : ''} onClick={() => setView('payables')}><Icon name="out"/>A pagar</button>
