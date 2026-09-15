@@ -6,6 +6,8 @@ import { completeFirstPasswordChange, touchClientLogin } from '../lib/client-acc
 import CentralFinanceiraV2 from './CentralFinanceiraV2';
 import SimpleControlAppV2 from './SimpleControlAppV2';
 import BasicControlAppV1 from './BasicControlAppV1';
+import CompleteControlAppV1 from './CompleteControlAppV1';
+import ControlTierOnboarding from './ControlTierOnboarding';
 
 function PasswordChangeGate({ email }) {
   const [currentPassword, setCurrentPassword] = useState('');
@@ -147,8 +149,10 @@ export default function CentralFinanceiraEntry() {
 
         const needsOnboarding = !settings || settings.control_tier === 'unconfigured' || !settings.control_start_month;
         if (!cancelled) {
-          if (needsOnboarding || settings.control_tier === 'simple') setExperience('simple');
+          if (needsOnboarding) setExperience('onboarding');
+          else if (settings.control_tier === 'simple') setExperience('simple');
           else if (settings.control_tier === 'basic') setExperience('basic');
+          else if (settings.control_tier === 'complete') setExperience('complete');
           else setExperience('access-error');
         }
       } catch {
@@ -169,7 +173,9 @@ export default function CentralFinanceiraEntry() {
   if (experience === 'blocked') return <AccessGate title="Acesso bloqueado" message="Este acesso está bloqueado. Entre em contato com o escritório para reativação."/>;
   if (experience === 'no-company') return <AccessGate title="Empresa não vinculada" message="Seu usuário existe, mas o vínculo com a empresa não está válido. Entre em contato com o escritório."/>;
   if (experience === 'access-error') return <AccessGate title="Não foi possível validar o acesso" message="A Central não liberou nenhuma área porque não foi possível confirmar suas permissões. Tente novamente ou entre em contato com o escritório."/>;
+  if (experience === 'onboarding') return <ControlTierOnboarding />;
   if (experience === 'simple') return <SimpleControlAppV2 />;
   if (experience === 'basic') return <BasicControlAppV1 />;
+  if (experience === 'complete') return <CompleteControlAppV1 />;
   return <CentralFinanceiraV2 />;
 }
