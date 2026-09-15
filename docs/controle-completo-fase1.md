@@ -66,6 +66,15 @@ O Controle Completo recalcula o saldo após cada evento do período:
 
 `saldo acumulado anterior + entrada - saída`.
 
+Exemplo simplificado:
+
+| Data | Evento | Efeito | Saldo acumulado |
+| --- | --- | ---: | ---: |
+| 01/10 | Saldo inicial | — | R$ 5.000 |
+| 05/10 | Recebimento | +R$ 3.000 | R$ 8.000 |
+| 08/10 | Aluguel | -R$ 2.000 | R$ 6.000 |
+| 10/10 | Fornecedor previsto | -R$ 7.200 | -R$ 1.200 |
+
 No consolidado de **Todas as contas**:
 
 - parte do saldo existente no início do período;
