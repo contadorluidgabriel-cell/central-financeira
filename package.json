@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:ofx": "node --test tests/ofx-parser.test.mjs"
   },
   "dependencies": {
     "@neondatabase/neon-js": "0.7.0-beta",
