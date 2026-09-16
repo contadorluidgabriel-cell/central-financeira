@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { neonTest } from '../lib/neon-test-client';
+import { buildOfxPostingPayload, explainOfxPostingError } from '../lib/ofx-posting-payload.mjs';
 import styles from './OfxEntryPostingLauncher.module.css';
 
 const currency = value => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value || 0));
@@ -95,15 +96,9 @@ export default function OfxEntryPostingLauncher() {
     if (!company || !selected.length || selected.length > 100 || !acknowledged || busy) return;
     setBusy(true); setError(''); setNotice('');
     try {
-      const pItems = selected.map(item => ({
-        transactionId: item.id,
-        entryType: choices[item.id].entryType,
-        categoryId: choices[item.id].categoryId || null,
-        description: (choices[item.id].description ?? item.description).trim()
-      }));
-      if (pItems.some(item => !item.description || item.description.length > 300)) throw new Error('Revise as descrições dos lançamentos selecionados.');
+      const pItems = buildOfxPostingPayload(selected, choices);
       const outcome = await neonTest.rpc('post_ofx_financial_entries', { p_organization_id: organizationId, p_items: pItems });
-      if (outcome.error) throw outcome.error;
+      if (outcome.error) throw new Error(explainOfxPostingError(outcome.error));
       const data = Array.isArray(outcome.data) ? outcome.data[0] : outcome.data;
       const result = data?.post_ofx_financial_entries || data || {};
       setNotice(`${Number(result.posted || 0)} lançamento(s) registrado(s). ${Number(result.alreadyPosted || 0)} já registrado(s) e ignorado(s). Atualize o painel financeiro para ver os novos valores.`);
