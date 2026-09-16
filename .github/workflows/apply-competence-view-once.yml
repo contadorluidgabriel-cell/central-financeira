@@ -1,0 +1,35 @@
+name: Apply competence view layout (one-time)
+on:
+  push:
+    branches:
+      - feature/ofx-lote-competencia-copia-senha
+    paths:
+      - .github/workflows/apply-competence-view-once.yml
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Apply guarded competence patch
+        run: node scripts/fix-competence-view.mjs
+      - name: Validate changes
+        run: |
+          git diff --check
+          npm install --no-audit --no-fund
+          npm run test:ofx
+          node --test tests/ofx-batch-choices.test.mjs
+          npm run build
+      - name: Commit validated UI changes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add components/BasicControlAppV1.jsx components/CompleteControlAppV36.jsx
+          git commit -m 'fix(competencia): keep closing within complete-control layout'
+          git push
