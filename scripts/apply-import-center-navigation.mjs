@@ -3,10 +3,10 @@ import fs from 'node:fs';
 const changes = [];
 function edit(path, operations) {
   let source = fs.readFileSync(path, 'utf8');
-  for (const [before, after, label] of operations) {
+  for (const [before, after, label, expected = 1] of operations) {
     const matches = source.split(before).length - 1;
-    if (matches !== 1) throw new Error(`${path}: expected one occurrence of ${label}, found ${matches}`);
-    source = source.replace(before, after);
+    if (matches !== expected) throw new Error(`${path}: expected ${expected} occurrence(s) of ${label}, found ${matches}`);
+    source = source.replaceAll(before, after);
   }
   fs.writeFileSync(path, source);
   changes.push(`${path}: ${operations.map(([, , label]) => label).join(', ')}`);
@@ -27,7 +27,7 @@ edit('components/SimpleControlAppV2.jsx', [
 
 edit('components/BasicControlAppV1.jsx', [
   ["        <NavButton active={view === 'expenses'} icon=\"expense\" label=\"Despesas\" onClick={() => navigate('expenses')}/>", "        <NavButton active={view === 'expenses'} icon=\"expense\" label=\"Despesas\" onClick={() => navigate('expenses')}/>\n        <NavButton active={false} icon=\"download\" label=\"Importações\" onClick={() => window.location.assign('/importacoes')}/>", 'desktop import navigation'],
-  ["<button className={styles.secondaryButtonSmall} onClick={onImport}><Icon name=\"download\"/>Importar</button>", '', 'remove inline revenue and expense import buttons'],
+  ["<button className={styles.secondaryButtonSmall} onClick={onImport}><Icon name=\"download\"/>Importar</button>", '', 'remove inline revenue and expense import buttons', 2],
   ["    <button onClick={() => { onNavigate('settings'); setMoreOpen(false); }}><Icon name=\"settings\"/>Configurações</button>", "    <button onClick={() => { onNavigate('settings'); setMoreOpen(false); }}><Icon name=\"settings\"/>Configurações</button>\n    <button onClick={() => window.location.assign('/importacoes')}><Icon name=\"download\"/>Importações</button>", 'mobile import navigation']
 ]);
 
