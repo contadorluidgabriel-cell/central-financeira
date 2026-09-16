@@ -43,7 +43,7 @@ const NAV=[
   {group:'Planejamento',items:[['cashflow','Fluxo de caixa','cash'],['statement','Extrato','statement'],['installments','Parcelamentos','installment'],['recurring','Recorrências','repeat']]},
   {group:'Auditoria',items:[['imports','Importações','statement'],['history','Histórico','history']]}
 ];
-const TITLES={overview:['Visão geral','A posição financeira da empresa em uma leitura só.'],today:['Hoje','O que exige atenção agora e nos próximos dias.'],accounts:['Contas','Onde o dinheiro efetivamente está.'],receivables:['Contas a receber','Valores que ainda precisam entrar no caixa.'],payables:['Contas a pagar','Compromissos que ainda precisam sair do caixa.'],cashflow:['Fluxo de caixa','Realizado e projetado com saldo acumulado.'],statement:['Extrato por conta','Movimentações e saldo após cada evento.'],installments:['Parcelamentos','Compras e vendas divididas em obrigações reais.'],recurring:['Recorrências','Compromissos mensais que alimentam o financeiro.'],history:['Histórico financeiro','Baixas, transferências, estornos e trilha de auditoria.']};
+const TITLES={competency:['Competência','Confira e conclua o mês sem sair do Controle Completo.'],overview:['Visão geral','A posição financeira da empresa em uma leitura só.'],today:['Hoje','O que exige atenção agora e nos próximos dias.'],accounts:['Contas','Onde o dinheiro efetivamente está.'],receivables:['Contas a receber','Valores que ainda precisam entrar no caixa.'],payables:['Contas a pagar','Compromissos que ainda precisam sair do caixa.'],cashflow:['Fluxo de caixa','Realizado e projetado com saldo acumulado.'],statement:['Extrato por conta','Movimentações e saldo após cada evento.'],installments:['Parcelamentos','Compras e vendas divididas em obrigações reais.'],recurring:['Recorrências','Compromissos mensais que alimentam o financeiro.'],history:['Histórico financeiro','Baixas, transferências, estornos e trilha de auditoria.']};
 
 function Icon({name}){const p={home:<><path d="M3 11 12 3l9 8"/><path d="M5 10v11h14V10"/></>,today:<><path d="M4 5h16v15H4z"/><path d="M8 3v4M16 3v4M4 10h16"/></>,chart:<><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></>,wallet:<><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M16 10h5v4h-5a2 2 0 0 1 0-4Z"/></>,in:<><path d="M12 3v14"/><path d="m7 12 5 5 5-5"/></>,out:<><path d="M12 21V7"/><path d="m7 12 5-5 5 5"/></>,cash:<><path d="M3 7h18v10H3z"/><circle cx="12" cy="12" r="2.4"/></>,statement:<><path d="M5 3h14v18H5z"/><path d="M8 8h8M8 12h8M8 16h5"/></>,installment:<><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M7 10h10M7 14h4"/></>,repeat:<><path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="m7 22-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/></>,history:<><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 7v5l3 2"/></>,plus:<path d="M12 5v14M5 12h14"/>,transfer:<><path d="M4 7h14"/><path d="m14 3 4 4-4 4"/><path d="M20 17H6"/><path d="m10 13-4 4 4 4"/></>,refresh:<><path d="M20 7h-5V2"/><path d="M20 7a8 8 0 1 0 1 8"/></>,logout:<><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M21 19V5a2 2 0 0 0-2-2h-6"/></>,edit:<><path d="m4 20 4-1 11-11-3-3L5 16z"/><path d="m14 6 3 3"/></>,undo:<><path d="m9 7-5 5 5 5"/><path d="M4 12h10a6 6 0 0 1 6 6"/></>,close:<path d="m6 6 12 12M18 6 6 18"/>,back:<path d="m15 18-6-6 6-6"/>};return <svg viewBox="0 0 24 24" className={styles.icon}>{p[name]||p.home}</svg>}
 
@@ -81,7 +81,6 @@ export default function CompleteControlAppV36(){
 
   if(session.isPending||!data)return <Center text="Carregando Controle Completo…"/>;
   if(!company)return <Center text="Nenhuma empresa disponível para este acesso."/>;
-  if(view==='competency')return <div className={styles.competencyBridge}><BasicControlAppV1/><button className={styles.backFinance} onClick={()=>{setView('overview');refresh()}}><Icon name="back"/>Voltar ao financeiro</button></div>;
 
   const title=TITLES[view]||TITLES.overview;
   return <div className={styles.shell}>
@@ -94,6 +93,7 @@ export default function CompleteControlAppV36(){
       <header className={styles.topbar}><div><span>Controle Completo</span><h1>{title[0]}</h1><p>{title[1]}</p></div><div className={styles.topActions}><HeaderActions view={view} onModal={setModal}/><button className={styles.iconButton} onClick={refresh} disabled={busy} title="Atualizar"><Icon name="refresh"/></button></div></header>
       {error&&<div className={styles.error}>{error}</div>}
       <div className={styles.content}>
+        {view==='competency'&&<div className={styles.competencyBridge} style={{minHeight:0}}><BasicControlAppV1 embedded /></div>}
         {view==='overview'&&<Overview accounts={accounts} obligations={obligations} onView={setView} onDetail={setDetail}/>} 
         {view==='today'&&<Today accounts={accounts} obligations={obligations} onDetail={setDetail}/>} 
         {view==='accounts'&&<Accounts accounts={accounts}/>} 

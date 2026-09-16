@@ -17,3 +17,6 @@
  .totals{align-items:flex-start;display:grid}.totals span{line-height:1.4}
  .ack{font-size:13px;align-items:flex-start}.primary{width:100%}
 }
+
+.batchToolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:14px;border:1px solid #cbd9ff;background:#f5f8ff;border-radius:12px}.batchToolbar>div{flex:1 1 270px;display:grid;gap:5px}.batchToolbar strong{font-size:13px}.batchToolbar span{font-size:12px;color:#475467;line-height:1.5}
+@media(max-width:620px){.batchToolbar{align-items:stretch}.batchToolbar>div{flex:1 1 100%}.batchToolbar .secondary{width:100%;min-height:48px;font-size:14px}}

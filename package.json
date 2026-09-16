@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test:ofx": "node --test tests/ofx-parser.test.mjs tests/ofx-posting-payload.test.mjs"
+    "test:ofx": "node --test tests/ofx-parser.test.mjs tests/ofx-posting-payload.test.mjs tests/ofx-batch-choices.test.mjs"
   },
   "dependencies": {
     "@neondatabase/neon-js": "0.7.0-beta",
