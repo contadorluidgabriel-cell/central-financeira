@@ -645,14 +645,17 @@ export default function CentralFinanceiraV2() {
         setModal(null);
       };
 
-      const copyCredentials = async () => {
-        if (!accessResult?.temporaryPassword) return;
-        const text = `Central Financeira\nAcesso: https://centralfinanceira-peach.vercel.app\nE-mail: ${accessResult.email}\nSenha provisória: ${accessResult.temporaryPassword}\n\nNo primeiro acesso, crie sua senha pessoal.`;
+      const welcomeMessage = accessResult?.temporaryPassword
+        ? `Olá! Seu acesso à Central Financeira está pronto.\n\nEmpresa: ${c.name}\nAcesse: https://centralfinanceira-peach.vercel.app/\nE-mail: ${accessResult.email}\nSenha provisória: ${accessResult.temporaryPassword}\n\nNo primeiro acesso, entre com a senha provisória e crie sua senha pessoal.\nSe precisar de ajuda, me chame por aqui.\n\nContador Luid Gabriel`
+        : '';
+
+      const copyMessage = async () => {
+        if (!welcomeMessage) return;
         try {
-          await navigator.clipboard.writeText(text);
-          setToast('Credenciais copiadas.');
+          await navigator.clipboard.writeText(welcomeMessage);
+          setToast('Mensagem de acesso copiada.');
         } catch {
-          setToast('Não foi possível copiar automaticamente.');
+          setToast('Não foi possível copiar automaticamente. Selecione o texto da mensagem para copiar.');
         }
       };
 
@@ -699,14 +702,16 @@ export default function CentralFinanceiraV2() {
         <div style={{display:'grid',gap:16}}>
           <div><strong style={{display:'block',fontSize:15}}>{c.name}</strong><span className="muted" style={{fontSize:13}}>{c.document || 'Documento não informado'}</span></div>
           {accessResult?.temporaryPassword ? <>
-            <div className={styles.modalHint}><b>Senha provisória criada.</b> Ela é mostrada somente agora. Copie as credenciais e envie ao cliente pelo seu canal habitual.</div>
+            <div className={styles.modalHint}><b>Acesso preparado.</b> Confira e copie a mensagem abaixo. A senha provisória é mostrada somente nesta etapa, inclusive após uma redefinição.</div>
             <div className={styles.formGrid2}>
               <div className="field full"><label>E-mail de login</label><input className="input" readOnly value={accessResult.email}/></div>
               <div className="field full"><label>Senha provisória</label><input className="input" readOnly value={accessResult.temporaryPassword} onFocus={e=>e.currentTarget.select()}/></div>
             </div>
-            <button type="button" className="btn btn-primary" onClick={copyCredentials}>Copiar credenciais</button>
+            <div className="field full"><label htmlFor="client-access-message">Mensagem pronta para enviar</label><textarea id="client-access-message" className="textarea" readOnly value={welcomeMessage} rows={11} onFocus={event=>event.currentTarget.select()} style={{width:"100%",fontSize:14,lineHeight:1.6,resize:"vertical"}}/></div>
+            <button type="button" className="btn btn-primary" onClick={copyMessage}><Icon name="file"/>Copiar mensagem para o cliente</button>
+            <div className={styles.modalHint}>A mensagem inclui uma senha provisória. Confira o destinatário e envie por um canal privado; ao fechar esta tela, a senha deixa de ser exibida.</div>
           </> : !access ? <>
-            <div className="field"><label>E-mail de login</label><input className="input" type="email" value={accessDraft.email} onChange={e=>setAccessDraft({email:e.target.value})} autoFocus/><span className="help">A senha provisória usa o CNPJ/CPF somente com números. Se não houver documento cadastrado, o sistema gera uma alternativa temporária. No primeiro login, o cliente será obrigado a criar a própria senha.</span></div>
+            <div className="field"><label>E-mail de login</label><input className="input" type="email" value={accessDraft.email} onChange={e=>setAccessDraft({email:e.target.value})} autoFocus/><span className="help">O sistema gera uma senha provisória aleatória. Ela aparece uma única vez após a criação do acesso; no primeiro login, o cliente deverá criar sua senha pessoal.</span></div>
           </> : <>
             <div className={styles.settlementSummary}>
               <div><span>Status</span><strong>{statusLabel}</strong></div>
