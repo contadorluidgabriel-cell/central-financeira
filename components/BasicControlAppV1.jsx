@@ -114,13 +114,13 @@ function periodExpenseMode({ company, month, entries, submission }) {
   return company.expenseMode;
 }
 
-export default function BasicControlAppV1() {
+export default function BasicControlAppV1({ embedded = false } = {}) {
   const session = neonTest.auth.useSession();
   const user = session.data?.user || null;
   const activeOrganizationId = session.data?.session?.activeOrganizationId || null;
   const [state, setState] = useState(null);
   const [selectedCompanyId, setSelectedCompanyId] = useState(null);
-  const [view, setView] = useState('overview');
+  const [view, setView] = useState(embedded ? 'closing' : 'overview');
   const [month, setMonth] = useState(monthKey());
   const [modal, setModal] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -269,8 +269,8 @@ export default function BasicControlAppV1() {
   const expenseEntries = byType(currentEntries, 'expense');
   const navigate = target => { setView(target); setSearch(''); setFilters({ category: '', customer: '', supplier: '', payment: '', status: '', min: '', max: '', sort: 'date_desc' }); };
 
-  return <div className={styles.shell}>
-    <aside className={styles.sidebar}>
+  return <div className={styles.shell} style={embedded ? {minHeight:0,background:'transparent'} : undefined}>
+    {!embedded && <aside className={styles.sidebar}>
       <div className={styles.brand}><div className={styles.brandMark}>LG</div><div><strong>Central Financeira</strong><span>Controle Básico</span></div></div>
       {state.systemRole === 'super_admin' && <div className={styles.companyPicker}><label>Empresa em teste</label><select value={company.id} onChange={e => { setSelectedCompanyId(e.target.value); setView('overview'); }}>
         {state.companies.map(item => <option value={item.id} key={item.id}>{item.name}</option>)}
@@ -287,11 +287,12 @@ export default function BasicControlAppV1() {
         <NavButton active={view === 'settings'} icon="settings" label="Configurações" onClick={() => navigate('settings')}/>
       </nav>
       <div className={styles.sidebarFooter}><button onClick={signOut}><Icon name="logout"/>Sair</button></div>
-    </aside>
+    </aside>}
 
-    <main className={styles.main}>
-      <header className={styles.topbar}><div><strong>{company.name}</strong><span>{company.document || 'Documento não informado'} · Controle Básico</span></div><div className={styles.topActions}><MonthPicker value={month} startMonth={startMonth} onChange={setMonth}/><div className={styles.avatar}>{initials(user.name || user.email)}</div></div></header>
-      <div className={styles.content}>
+    <main className={styles.main} style={embedded ? {marginLeft:0,minHeight:0,width:'100%'} : undefined}>
+      {!embedded && <header className={styles.topbar}><div><strong>{company.name}</strong><span>{company.document || 'Documento não informado'} · Controle Básico</span></div><div className={styles.topActions}><MonthPicker value={month} startMonth={startMonth} onChange={setMonth}/><div className={styles.avatar}>{initials(user.name || user.email)}</div></div></header>}
+      {embedded && <div className={styles.topbar} style={{position:'static',height:'auto',minHeight:66,padding:'12px 16px',marginBottom:14,borderRadius:12,flexWrap:'wrap'}}><div><strong>Competência mensal</strong><span>{company.name}</span></div><MonthPicker value={month} startMonth={startMonth} onChange={setMonth}/></div>}
+      <div className={styles.content} style={embedded ? {padding:0,maxWidth:'none'} : undefined}>
         {error && <div className={styles.errorBanner}>{error}</div>}
         {state.systemRole === 'super_admin' && state.notifications.filter(n => !n.read_at).slice(0, 3).map(n => <div className={styles.notifications} key={n.id}><button onClick={() => run(() => markBasicNotificationRead(n.id))}><div><strong>{n.title}</strong><span>{n.message}</span></div><small>Marcar como lida</small></button></div>)}
 
@@ -316,7 +317,7 @@ export default function BasicControlAppV1() {
         {view === 'reports' && <Reports company={company} month={month} revenueMode={revenueMode} expenseMode={expenseMode} entries={allCompanyEntries}/>} 
         {view === 'closing' && <Closing month={month} currentMonth={state.currentMonth} revenueEntries={revenueEntries} expenseEntries={expenseEntries} submission={currentSubmission} status={status} locked={locked} busy={busy} onComplete={async values => {
           const result = await run(() => completeBasicMonth({ organizationId: company.id, month, revenueMode, expenseMode, ...values }), 'Mês concluído.');
-          if (result) setView('overview');
+          if (result) setView(embedded ? 'closing' : 'overview');
         }} onReopen={() => setModal({ type: 'reopen' })}/>} 
         {view === 'settings' && <Settings company={company} currentMonth={state.currentMonth} revenueCategories={categoriesRevenue} expenseCategories={categoriesExpense} paymentMethods={paymentMethods}
           onRevenueMode={mode => run(() => scheduleBasicRevenueMode(company.id, mode, nextMonth(state.currentMonth)), `Mudança de receitas programada para ${monthName(nextMonth(state.currentMonth))}.`)}
@@ -331,7 +332,7 @@ export default function BasicControlAppV1() {
       </div>
     </main>
 
-    <BasicMobileNav view={view} revenueDetailed={revenueMode === 'individual'} expenseDetailed={expenseMode === 'individual'} onNavigate={navigate}/>
+    {!embedded && <BasicMobileNav view={view} revenueDetailed={revenueMode === 'individual'} expenseDetailed={expenseMode === 'individual'} onNavigate={navigate}/>}
 
     {modal && <Modal title={modalTitle(modal.type)} wide={modal.type === 'revenueImport' || modal.type === 'expenseImport'} onClose={() => !busy && setModal(null)}>
       {modal.type === 'revenue' && <RevenueForm mode={revenueMode} entry={modal.entry} draft={modal.draft} categories={categoriesRevenue.filter(c => c.active)} customers={customers.filter(c => c.active)} paymentMethods={paymentMethods.filter(p => p.active)} busy={busy} onQuickCustomer={draft => setModal({ type: 'customer', returnToRevenue: true, revenueDraft: draft })} onSubmit={async values => { const result = await run(() => saveSimpleRevenue({ organizationId: company.id, month, mode: revenueMode, existingId: modal.entry?.id, ...values }), modal.entry ? 'Receita atualizada.' : 'Receita registrada.'); if (result) setModal(null); }}/>} 
