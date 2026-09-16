@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { neonTest } from '../lib/neon-test-client';
 import { buildOfxPostingPayload, explainOfxPostingError } from '../lib/ofx-posting-payload.mjs';
+import { prepareOfxBatch } from '../lib/ofx-batch-choices.mjs';
 import styles from './OfxEntryPostingLauncher.module.css';
 
 const currency = value => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value || 0));
@@ -27,6 +28,7 @@ export default function OfxEntryPostingLauncher({ autoOpen = false, preferredOrg
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(false);
+  const [batchSummary, setBatchSummary] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -78,7 +80,7 @@ export default function OfxEntryPostingLauncher({ autoOpen = false, preferredOrg
       setCategories(categoriesResult.data || []);
       setAccounts(accountsResult.data || []);
       setImports(importsResult.data || []);
-      setChoices({}); setAcknowledged(false);
+      setChoices({}); setAcknowledged(false); setBatchSummary(null);
     } catch (err) { setError(errorMessage(err)); }
     finally { setLoading(false); }
   }
@@ -90,6 +92,17 @@ export default function OfxEntryPostingLauncher({ autoOpen = false, preferredOrg
   function changeChoice(id, patch) {
     setChoices(current => ({ ...current, [id]: { ...(current[id] || {}), ...patch } }));
     setAcknowledged(false); setNotice('');
+  }
+
+  function prepareBatch() {
+    if (!company || busy || loading) return;
+    const batch = prepareOfxBatch(rows, company.tier);
+    setChoices(batch.choices);
+    setBatchSummary(batch);
+    setPendingOnly(true);
+    setAcknowledged(false);
+    setError('');
+    setNotice(batch.prepared ? 'Lote preparado para revisão. Nenhum lançamento foi criado ainda.' : 'Não há movimentos elegíveis para seleção rápida. Confira e classifique manualmente os que forem apropriados.');
   }
 
   async function postSelected() {
@@ -113,7 +126,7 @@ export default function OfxEntryPostingLauncher({ autoOpen = false, preferredOrg
     {open && <div className={styles.overlay} role="presentation" onMouseDown={event => { if (event.target === event.currentTarget && !busy) setOpen(false); }}>
       <section className={styles.dialog} role="dialog" aria-modal="true" aria-labelledby="ofx-posting-title">
         <header className={styles.header}>
-          <div><span className={styles.eyebrow}>Central Financeira · Extrato bancário</span><h2 id="ofx-posting-title">Criar lançamentos do OFX</h2><p>Converta movimentações já importadas em receitas ou despesas com confirmação individual.</p></div>
+          <div><span className={styles.eyebrow}>Central Financeira · Extrato bancário</span><h2 id="ofx-posting-title">Criar lançamentos do OFX</h2><p>Converta movimentações individualmente ou prepare um lote para confirmar de uma vez.</p></div>
           <button type="button" className={styles.close} aria-label="Fechar" onClick={() => !busy && setOpen(false)} disabled={busy}>×</button>
         </header>
         <div className={styles.body}>
@@ -127,6 +140,12 @@ export default function OfxEntryPostingLauncher({ autoOpen = false, preferredOrg
           {error && <p className={styles.error} role="alert">{error}</p>}
           {notice && <p className={styles.success} role="status">{notice}</p>}
           <div className={styles.summary}><strong>{rows.filter(item => !item.posted_at).length} pendentes</strong><span>{rows.filter(item => item.posted_at).length} já lançados · mostrando até 500 movimentações recentes</span></div>
+          <div className={styles.batchToolbar}>
+            <div><strong>Preparar lançamentos em lote</strong><span>Até 100 movimentos por vez, inicialmente sem categoria. Confira os valores e retire transferências, empréstimos e valores já lançados antes de confirmar.</span></div>
+            <button type="button" className={styles.secondary} disabled={busy || loading || !rows.some(item => !item.posted_at)} onClick={prepareBatch}>Preparar lote</button>
+            <button type="button" className={styles.secondary} disabled={busy || loading || !selected.length} onClick={() => { setChoices({}); setAcknowledged(false); setBatchSummary(null); setNotice('Seleção limpa.'); }}>Limpar seleção</button>
+          </div>
+          {batchSummary && <p className={styles.hint} role="status">{batchSummary.prepared} preparado(s) · {batchSummary.flagged} item(ns) ambíguo(s) para revisão manual · {batchSummary.unsupported} incompatível(is) · {batchSummary.remaining} elegível(is) para próximo lote. As categorias podem ser definidas nos lançamentos depois.</p>}
           <div className={styles.items}>
             {loading && <p className={styles.empty}>Carregando extratos…</p>}
             {!loading && !filteredRows.length && <p className={styles.empty}>Nenhuma movimentação nesta visualização. Importe primeiro um arquivo OFX pelo botão “Importar OFX”.</p>}
@@ -153,7 +172,7 @@ export default function OfxEntryPostingLauncher({ autoOpen = false, preferredOrg
           <div className={styles.footer}>
             <div className={styles.totals}><strong>{selected.length} selecionado(s)</strong><span>Receitas: {currency(selectedRevenue)} · Despesas: {currency(selectedExpenses)}</span></div>
             {selected.length > 100 && <p className={styles.error} role="alert">O limite é de 100 lançamentos por confirmação. Desmarque alguns movimentos.</p>}
-            <label className={styles.ack}><input type="checkbox" checked={acknowledged} disabled={!selected.length || busy} onChange={event => setAcknowledged(event.target.checked)}/> Conferi que estes movimentos são receitas ou despesas e não foram lançados anteriormente.</label>
+            <label className={styles.ack}><input type="checkbox" checked={acknowledged} disabled={!selected.length || busy} onChange={event => setAcknowledged(event.target.checked)}/> Conferi o lote e retirei transferências, estornos, empréstimos e valores que já tinham lançamento manual.</label>
             <button className={styles.primary} type="button" disabled={busy || loading || !acknowledged || !selected.length || selected.length > 100} onClick={postSelected}>{busy ? 'Registrando…' : `Registrar ${selected.length} lançamento(s)`}</button>
           </div>
         </div>
