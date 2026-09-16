@@ -46,6 +46,7 @@ export default function ImportCenter() {
   const [accessError, setAccessError] = useState('');
   const [resetKey, setResetKey] = useState(0);
   const [history, setHistory] = useState([]);
+  const [historyRows, setHistoryRows] = useState([]);
   const [historyBusy, setHistoryBusy] = useState(false);
 
   const refresh = useCallback(async () => {
@@ -79,7 +80,7 @@ export default function ImportCenter() {
   const suppliers = data?.suppliers.filter(item => item.organization_id === organizationId && !item.merged_into) || [];
   const paymentMethods = data?.paymentMethods.filter(item => item.organization_id === organizationId) || [];
   const existingEntries = entries.filter(entry => entry.type === kind);
-  const historyCounts = useMemo(() => history.reduce((map, record) => { const current = map.get(record.import_id) || { total: 0, posted: 0 }; current.total++; if (record.posted_at) current.posted++; map.set(record.import_id, current); return map; }, new Map()), [history]);
+  const historyCounts = useMemo(() => historyRows.reduce((map, record) => { const current = map.get(record.import_id) || { total: 0, posted: 0 }; current.total++; if (record.posted_at) current.posted++; map.set(record.import_id, current); return map; }, new Map()), [historyRows]);
 
   useEffect(() => {
     if (tab !== 'history' || !organizationId) return;
@@ -109,7 +110,7 @@ export default function ImportCenter() {
     finally { setBusy(false); }
   }
 
-  function changeCompany(value) { setOrganizationId(value); setNotice(''); setError(''); setResetKey(value => value + 1); }
+  function changeCompany(value) { setKind('revenue'); setOrganizationId(value); setNotice(''); setError(''); setResetKey(value => value + 1); }
   function changeMonth(value) { setMonth(value); setNotice(''); setError(''); setResetKey(value => value + 1); }
   function changeKind(value) { setKind(value); setNotice(''); setError(''); setResetKey(value => value + 1); }
 
