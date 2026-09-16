@@ -1,4 +1,5 @@
 import './globals.css';
+import OfxImportLauncher from '../components/OfxImportLauncher';
 
 export const metadata = {
   title: 'Central Financeira',
@@ -8,7 +9,7 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="pt-BR">
-      <body>{children}</body>
+      <body>{children}<OfxImportLauncher/></body>
     </html>
   );
 }
