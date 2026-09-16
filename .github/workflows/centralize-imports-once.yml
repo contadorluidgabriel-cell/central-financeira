@@ -1,0 +1,30 @@
+name: Centralize imports (one-time)
+
+on:
+  push:
+    branches: [feature/central-importacoes]
+    paths: ['.github/workflows/centralize-imports-once.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/central-importacoes
+          persist-credentials: true
+      - name: Apply checked source replacements
+        run: node scripts/apply-import-center-navigation.mjs
+      - name: Check patch and commit
+        run: |
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add components/ImportCenter.jsx components/SimpleControlAppV2.jsx components/BasicControlAppV1.jsx components/CompleteControlAppV36.jsx
+          git diff --cached --stat
+          git commit -m "refactor(importacoes): move import navigation to dedicated module"
+          git push origin HEAD:feature/central-importacoes
