@@ -29,7 +29,7 @@ create table if not exists public.ofx_bank_transactions (
 create index if not exists ofx_bank_transactions_org_date_idx on public.ofx_bank_transactions(organization_id, posted_on desc, created_at desc);
 alter table public.ofx_bank_imports enable row level security;
 alter table public.ofx_bank_transactions enable row level security;
-revoke all on public.ofx_bank_imports, public.ofx_bank_transactions from public, anon, authenticated;
+revoke all on public.ofx_bank_imports, public.ofx_bank_transactions from public, authenticated;
 grant select on public.ofx_bank_imports, public.ofx_bank_transactions to authenticated;
 do $$ begin
  if not exists (select 1 from pg_policies where schemaname='public' and tablename='ofx_bank_imports' and policyname='ofx_bank_imports_read') then
@@ -95,5 +95,5 @@ begin
   if v_imported = 0 then delete from public.ofx_bank_imports where id=v_batch; end if;
   return jsonb_build_object('imported',v_imported,'duplicates',v_total-v_imported,'batchId',case when v_imported>0 then v_batch else null end);
 end $$;
-revoke all on function public.import_ofx_bank_statement(uuid,uuid,text,text,jsonb) from public, anon;
+revoke all on function public.import_ofx_bank_statement(uuid,uuid,text,text,jsonb) from public;
 grant execute on function public.import_ofx_bank_statement(uuid,uuid,text,text,jsonb) to authenticated;
