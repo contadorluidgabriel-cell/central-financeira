@@ -10,12 +10,12 @@ const dateBR = value => String(value || '').split('-').reverse().join('/');
 const tiers = { simple: 'Simples', basic: 'Básico', complete: 'Completo' };
 const getError = error => error?.message || error?.error_description || 'Não foi possível concluir a operação.';
 
-export default function OfxImportLauncher() {
+export default function OfxImportLauncher({ preferredOrganizationId = '', onReviewImported } = {}) {
   const session = neonTest.auth.useSession();
   const user = session.data?.user || null;
   const [context, setContext] = useState(null);
   const [open, setOpen] = useState(false);
-  const [organizationId, setOrganizationId] = useState('');
+  const [organizationId, setOrganizationId] = useState(preferredOrganizationId);
   const [accounts, setAccounts] = useState([]);
   const [accountId, setAccountId] = useState('');
   const [recent, setRecent] = useState([]);
@@ -26,6 +26,7 @@ export default function OfxImportLauncher() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [reviewReady, setReviewReady] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -82,12 +83,12 @@ export default function OfxImportLauncher() {
   }, [open, organizationId]);
 
   function changeCompany(value) {
-    setOrganizationId(value); setParsed(null); setSelected([]); setDuplicates([]); setFilter('all'); setNotice(''); setError('');
+    setOrganizationId(value); setParsed(null); setSelected([]); setDuplicates([]); setFilter('all'); setNotice(''); setError(''); setReviewReady(false);
   }
 
   async function chooseFile(file) {
     if (!file || !company) return;
-    setBusy(true); setError(''); setNotice(''); setParsed(null); setDuplicates([]); setSelected([]);
+    setBusy(true); setError(''); setNotice(''); setReviewReady(false); setParsed(null); setDuplicates([]); setSelected([]);
     try {
       const result = await parseOfxFile(file);
       const existing = await neonTest.from('ofx_bank_transactions').select('fitid').eq('organization_id', organizationId).eq('bank_ref', result.bankRef).limit(5000);
@@ -103,7 +104,7 @@ export default function OfxImportLauncher() {
   async function confirm() {
     if (!company || !parsed || !selected.length || busy) return;
     if (company.tier === 'complete' && !accountId) { setError('Selecione a conta financeira correspondente ao extrato.'); return; }
-    setBusy(true); setError(''); setNotice('');
+    setBusy(true); setError(''); setNotice(''); setReviewReady(false);
     try {
       const rows = parsed.rows.filter(row => selectedSet.has(row.rowNumber) && !row.errors.length && !duplicateSet.has(row.fitid)).map(({ fitid, postedOn, amount, description, transactionType }) => ({ fitid, postedOn, amount, description, transactionType }));
       if (rows.length !== selected.length) throw new Error('Revise a seleção de movimentações.');
@@ -112,6 +113,7 @@ export default function OfxImportLauncher() {
       const value = Array.isArray(outcome.data) ? outcome.data[0] : outcome.data;
       const result = value?.import_ofx_bank_statement || value || {};
       setNotice(`${Number(result.imported || 0)} movimentação(ões) guardada(s) para conferência. ${Number(result.duplicates || 0)} duplicada(s) ignorada(s). Nenhum saldo ou lançamento foi alterado.`);
+      setReviewReady(Number(result.imported || 0) > 0);
       setParsed(null); setSelected([]); setDuplicates([]);
       const history = await neonTest.from('ofx_bank_transactions').select('id,posted_on,amount,description,created_at').eq('organization_id', organizationId).order('created_at', { ascending: false }).limit(30);
       if (!history.error) setRecent(history.data || []);
@@ -138,6 +140,7 @@ export default function OfxImportLauncher() {
           <label className={styles.upload}><strong>{busy ? 'Processando arquivo…' : 'Selecionar arquivo .ofx'}</strong><span>OFX 1.x ou 2.x · até 2 MB e 500 movimentos · leitura local no navegador</span><input type="file" accept=".ofx" disabled={busy || !company || (company.tier === 'complete' && !accounts.length)} onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; chooseFile(file); }}/></label>
           {error && <p role="alert" className={styles.error}>{error}</p>}
           {notice && <p role="status" className={styles.success}>{notice}</p>}
+          {reviewReady && <div className={styles.nextActions} aria-label="Próxima etapa do extrato"><button type="button" className={styles.reviewAction} onClick={() => { setOpen(false); setReviewReady(false); onReviewImported?.(organizationId); }}>Revisar e lançar movimentações</button><button type="button" className={styles.laterAction} onClick={() => { setOpen(false); setReviewReady(false); }}>Fazer isso depois</button></div>}
           {parsed && <>
             <div className={styles.summary}><div><strong>{parsed.fileName}</strong><span>Conta {parsed.accountLabel} · {parsed.currency}{parsed.currencyAssumed ? ' (presumido)' : ''}</span></div><div><strong>{parsed.rows.length}</strong><span>movimentações</span></div><div><strong>{selectable.length}</strong><span>disponíveis</span></div><div><strong>{parsed.rows.length - selectable.length}</strong><span>duplicadas ou inválidas</span></div></div>
             <div className={styles.controls}><label><input type="checkbox" checked={selectable.length > 0 && selectable.every(row => selectedSet.has(row.rowNumber))} onChange={event => setSelected(event.target.checked ? selectable.map(row => row.rowNumber) : [])}/> Selecionar todas as linhas disponíveis</label><select value={filter} onChange={event => setFilter(event.target.value)} aria-label="Filtrar movimentações"><option value="all">Todas</option><option value="in">Entradas</option><option value="out">Saídas</option></select></div>

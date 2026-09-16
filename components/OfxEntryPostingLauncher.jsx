@@ -10,12 +10,12 @@ const dateBR = value => String(value || '').slice(0, 10).split('-').reverse().jo
 const tierLabel = { simple: 'Simples', basic: 'Básico', complete: 'Completo' };
 const errorMessage = error => error?.message || error?.error_description || 'Não foi possível registrar os lançamentos.';
 
-export default function OfxEntryPostingLauncher() {
+export default function OfxEntryPostingLauncher({ autoOpen = false, preferredOrganizationId = '' } = {}) {
   const session = neonTest.auth.useSession();
   const user = session.data?.user || null;
   const [companies, setCompanies] = useState([]);
-  const [open, setOpen] = useState(false);
-  const [organizationId, setOrganizationId] = useState('');
+  const [open, setOpen] = useState(Boolean(autoOpen));
+  const [organizationId, setOrganizationId] = useState(preferredOrganizationId);
   const [rows, setRows] = useState([]);
   const [categories, setCategories] = useState([]);
   const [accounts, setAccounts] = useState([]);
