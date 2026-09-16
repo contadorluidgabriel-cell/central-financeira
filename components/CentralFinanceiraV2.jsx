@@ -649,6 +649,16 @@ export default function CentralFinanceiraV2() {
         ? `Olá! Seu acesso à Central Financeira está pronto.\n\nEmpresa: ${c.name}\nAcesse: https://centralfinanceira-peach.vercel.app/\nE-mail: ${accessResult.email}\nSenha provisória: ${accessResult.temporaryPassword}\n\nNo primeiro acesso, entre com a senha provisória e crie sua senha pessoal.\nSe precisar de ajuda, me chame por aqui.\n\nContador Luid Gabriel`
         : '';
 
+      const copyPassword = async () => {
+        if (!accessResult?.temporaryPassword) return;
+        try {
+          await navigator.clipboard.writeText(accessResult.temporaryPassword);
+          setToast('Senha provisória copiada.');
+        } catch {
+          setToast('Não foi possível copiar automaticamente. Selecione o campo da senha para copiar.');
+        }
+      };
+
       const copyMessage = async () => {
         if (!welcomeMessage) return;
         try {
@@ -708,7 +718,7 @@ export default function CentralFinanceiraV2() {
               <div className="field full"><label>Senha provisória</label><input className="input" readOnly value={accessResult.temporaryPassword} onFocus={e=>e.currentTarget.select()}/></div>
             </div>
             <div className="field full"><label htmlFor="client-access-message">Mensagem pronta para enviar</label><textarea id="client-access-message" className="textarea" readOnly value={welcomeMessage} rows={11} onFocus={event=>event.currentTarget.select()} style={{width:"100%",fontSize:14,lineHeight:1.6,resize:"vertical"}}/></div>
-            <button type="button" className="btn btn-primary" onClick={copyMessage}><Icon name="file"/>Copiar mensagem para o cliente</button>
+            <div style={{display:'flex',gap:10,flexWrap:'wrap'}}><button type="button" className="btn btn-secondary" onClick={copyPassword}><Icon name="lock"/>Copiar só a senha</button><button type="button" className="btn btn-primary" onClick={copyMessage}><Icon name="file"/>Copiar mensagem para o cliente</button></div>
             <div className={styles.modalHint}>A mensagem inclui uma senha provisória. Confira o destinatário e envie por um canal privado; ao fechar esta tela, a senha deixa de ser exibida.</div>
           </> : !access ? <>
             <div className="field"><label>E-mail de login</label><input className="input" type="email" value={accessDraft.email} onChange={e=>setAccessDraft({email:e.target.value})} autoFocus/><span className="help">O sistema gera uma senha provisória aleatória. Ela aparece uma única vez após a criação do acesso; no primeiro login, o cliente deverá criar sua senha pessoal.</span></div>
