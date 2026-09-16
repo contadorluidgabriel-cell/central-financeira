@@ -1,0 +1,34 @@
+name: Apply OFX batch controls (one-time)
+on:
+  push:
+    branches:
+      - feature/ofx-lote-competencia-copia-senha
+    paths:
+      - .github/workflows/apply-ofx-batch-once.yml
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Integrate batch UI
+        run: |
+          node scripts/add-ofx-batch-once.mjs
+          node scripts/add-ofx-batch-copy-once.mjs
+      - name: Validate build and tests
+        run: |
+          git diff --check
+          npm install --no-audit --no-fund
+          npm run test:ofx
+          npm run build
+      - name: Commit validated changes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add components/OfxEntryPostingLauncher.jsx components/OfxEntryPostingLauncher.module.css components/ImportCenter.jsx package.json
+          git commit -m 'feat(ofx): prepare up to 100 eligible movements for single confirmation'
+          git push
