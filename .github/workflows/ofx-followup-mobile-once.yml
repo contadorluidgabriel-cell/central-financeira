@@ -19,7 +19,7 @@ jobs:
       - name: Validate, build and commit
         run: |
           git diff --check
-          npm ci
+          npm install
           npm run test:ofx
           npm run build
           git config user.name "github-actions[bot]"
