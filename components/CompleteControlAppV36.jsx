@@ -41,7 +41,7 @@ const NAV=[
   {group:'Operação',items:[['overview','Visão geral','home'],['today','Hoje','today']]},
   {group:'Gestão',items:[['competency','Competência','chart'],['accounts','Contas','wallet'],['receivables','A receber','in'],['payables','A pagar','out']]},
   {group:'Planejamento',items:[['cashflow','Fluxo de caixa','cash'],['statement','Extrato','statement'],['installments','Parcelamentos','installment'],['recurring','Recorrências','repeat']]},
-  {group:'Auditoria',items:[['history','Histórico','history']]}
+  {group:'Auditoria',items:[['imports','Importações','statement'],['history','Histórico','history']]}
 ];
 const TITLES={overview:['Visão geral','A posição financeira da empresa em uma leitura só.'],today:['Hoje','O que exige atenção agora e nos próximos dias.'],accounts:['Contas','Onde o dinheiro efetivamente está.'],receivables:['Contas a receber','Valores que ainda precisam entrar no caixa.'],payables:['Contas a pagar','Compromissos que ainda precisam sair do caixa.'],cashflow:['Fluxo de caixa','Realizado e projetado com saldo acumulado.'],statement:['Extrato por conta','Movimentações e saldo após cada evento.'],installments:['Parcelamentos','Compras e vendas divididas em obrigações reais.'],recurring:['Recorrências','Compromissos mensais que alimentam o financeiro.'],history:['Histórico financeiro','Baixas, transferências, estornos e trilha de auditoria.']};
 
@@ -87,7 +87,7 @@ export default function CompleteControlAppV36(){
   return <div className={styles.shell}>
     <aside className={styles.sidebar}>
       <div className={styles.brand}><span>LG</span><div><strong>Central Financeira</strong><small>Controle Completo</small></div></div>
-      <nav>{NAV.map(group=><section key={group.group}><small>{group.group}</small>{group.items.map(([key,label,icon])=><button key={key} className={view===key?styles.navActive:''} onClick={()=>{setView(key);setDetail(null);setModal(null)}}><Icon name={icon}/><span>{label}</span></button>)}</section>)}</nav>
+      <nav>{NAV.map(group=><section key={group.group}><small>{group.group}</small>{group.items.map(([key,label,icon])=><button key={key} className={view===key?styles.navActive:''} onClick={()=>{if(key==='imports'){window.location.assign('/importacoes');return}setView(key);setDetail(null);setModal(null)}}><Icon name={icon}/><span>{label}</span></button>)}</section>)}</nav>
       <footer><div><small>Empresa</small><strong>{company.name}</strong></div><button onClick={signOut} disabled={busy}><Icon name="logout"/>Sair</button></footer>
     </aside>
     <main className={styles.main}>
