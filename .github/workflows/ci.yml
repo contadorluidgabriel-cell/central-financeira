@@ -20,5 +20,7 @@ jobs:
         run: npm install
       - name: Test OFX parser
         run: npm run test:ofx
+      - name: Test client access recovery
+        run: npm run test:access
       - name: Build
         run: npm run build
