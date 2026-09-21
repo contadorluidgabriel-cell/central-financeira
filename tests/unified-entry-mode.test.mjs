@@ -4,6 +4,7 @@ import {
   ENTRY_MODES,
   initialEntryModePatch,
   scheduledEntryModePatch,
+  normalizeAppliedEntryModePatch,
   hasConflictingScheduledModes
 } from '../lib/entry-mode-policy.mjs';
 
@@ -24,6 +25,28 @@ test('modo desconhecido e vigência atual/passada são rejeitados', () => {
   assert.throws(() => scheduledEntryModePatch('daily', '2026-09', '2026-09'), /futuro/);
   assert.throws(() => scheduledEntryModePatch('daily', '2026-08', '2026-09'), /futuro/);
   assert.throws(() => scheduledEntryModePatch('daily', '2026-13', '2026-09'), /futuro/);
+});
+
+test('agendamento legado isolado é aplicado em par, sem mudar o histórico', () => {
+  assert.deepEqual(normalizeAppliedEntryModePatch({ revenueMode: 'daily', pendingRevenueMode: null, pendingRevenueModeEffective: null }), {
+    revenueMode: 'daily', expenseMode: 'daily',
+    pendingRevenueMode: null, pendingExpenseMode: null,
+    pendingRevenueModeEffective: null, pendingExpenseModeEffective: null
+  });
+  assert.deepEqual(normalizeAppliedEntryModePatch({ expenseMode: 'individual', pendingExpenseMode: null, pendingExpenseModeEffective: null }), {
+    revenueMode: 'individual', expenseMode: 'individual',
+    pendingRevenueMode: null, pendingExpenseMode: null,
+    pendingRevenueModeEffective: null, pendingExpenseModeEffective: null
+  });
+});
+
+test('não aceita pares divergentes e não modifica o objeto original', () => {
+  const patch = { revenueMode: 'monthly' };
+  assert.deepEqual(normalizeAppliedEntryModePatch(patch), { revenueMode: 'monthly', expenseMode: 'monthly' });
+  assert.deepEqual(patch, { revenueMode: 'monthly' });
+  assert.throws(() => normalizeAppliedEntryModePatch({ revenueMode: 'monthly', expenseMode: 'daily' }), /mesma forma/);
+  assert.throws(() => normalizeAppliedEntryModePatch({ pendingRevenueMode: 'monthly', pendingExpenseMode: 'daily' }), /iguais/);
+  assert.throws(() => normalizeAppliedEntryModePatch({ pendingRevenueModeEffective: '2026-10', pendingExpenseModeEffective: '2026-11' }), /vigência/);
 });
 
 test('divergência de agendamentos legados é identificada', () => {
