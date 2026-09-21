@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { neonTest } from '../lib/neon-test-client';
-import { updateBasicSettings } from '../lib/neon-basic-control';
+import { saveInitialEntryMode } from '../lib/neon-basic-control';
 import { monthKey } from '../lib/neon-simple-control';
 import styles from './ControlTierOnboarding.module.css';
 
@@ -17,8 +17,7 @@ export default function ControlTierOnboarding() {
   const activeOrganizationId = session.data?.session?.activeOrganizationId || null;
   const [organization, setOrganization] = useState(null);
   const [tier, setTier] = useState('simple');
-  const [revenueMode, setRevenueMode] = useState('monthly');
-  const [expenseMode, setExpenseMode] = useState('monthly');
+  const [entryMode, setEntryMode] = useState('monthly');
   const [startMonth, setStartMonth] = useState(monthKey());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -51,12 +50,10 @@ export default function ControlTierOnboarding() {
     if (!organization) return;
     setBusy(true); setError('');
     try {
-      await updateBasicSettings(organization.id, {
+      await saveInitialEntryMode(organization.id, entryMode, {
         controlTier: tier,
         controlStartMonth: startMonth,
-        revenueMode,
-        expenseEnabled: tier === 'basic' || tier === 'complete',
-        expenseMode: tier === 'simple' ? 'monthly' : expenseMode
+        expenseEnabled: tier === 'basic' || tier === 'complete'
       });
       window.location.reload();
     } catch (err) {
@@ -85,9 +82,9 @@ export default function ControlTierOnboarding() {
 
         <div className={styles.settings}>
           <label><span>Começar a partir de</span><input type="month" required value={startMonth} onChange={e => setStartMonth(e.target.value)}/></label>
-          <label><span>Como informar receitas</span><select value={revenueMode} onChange={e => setRevenueMode(e.target.value)}><option value="monthly">Total do mês</option><option value="daily">Total por dia</option><option value="individual">Cada receita</option></select></label>
-          {tier !== 'simple' && <label><span>Como informar despesas</span><select value={expenseMode} onChange={e => setExpenseMode(e.target.value)}><option value="monthly">Total do mês</option><option value="daily">Total por dia</option><option value="individual">Cada despesa</option></select></label>}
+          <label><span>Como prefere registrar as movimentações?</span><select value={entryMode} onChange={e => setEntryMode(e.target.value)}><option value="monthly">Total do mês</option><option value="daily">Total por dia</option><option value="individual">Cada lançamento</option></select></label>
         </div>
+        <div className={styles.note}><strong>Uma forma de registro</strong><p>{tier === 'simple' ? 'Por enquanto, a escolha vale para receitas. Se você migrar para outro nível, o mesmo detalhamento será usado nas despesas.' : 'Receitas e despesas serão informadas separadamente, mas com o mesmo nível de detalhamento.'}</p></div>
 
         {tier === 'complete' && <div className={styles.note}><strong>O que acontece depois?</strong><p>Você cadastra os saldos iniciais das suas contas e, se existirem, valores antigos a receber ou pagar como saldos de abertura. Eles entram no financeiro sem alterar o resultado do mês.</p></div>}
 

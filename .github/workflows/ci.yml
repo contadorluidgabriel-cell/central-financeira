@@ -18,6 +18,8 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm install
+      - name: Test unified entry modes
+        run: npm run test:entry-mode
       - name: Test OFX parser
         run: npm run test:ofx
       - name: Test client access recovery

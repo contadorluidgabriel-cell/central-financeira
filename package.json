@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "test:ofx": "node --test tests/ofx-parser.test.mjs tests/ofx-posting-payload.test.mjs tests/ofx-batch-choices.test.mjs",
-    "test:access": "node --test tests/client-access-flow.test.mjs"
+    "test:access": "node --test tests/client-access-flow.test.mjs",
+    "test:entry-mode": "node --test tests/unified-entry-mode.test.mjs"
   },
   "dependencies": {
     "@neondatabase/neon-js": "0.7.0-beta",
