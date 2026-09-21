@@ -100,7 +100,7 @@ BEGIN
 END;
 $function$;
 
-REVOKE ALL ON FUNCTION public.find_recoverable_client_user(text, uuid) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.find_recoverable_client_user(text, uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.find_recoverable_client_user(text, uuid) TO authenticated;
-REVOKE ALL ON FUNCTION public.register_client_access(uuid, uuid, text) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.register_client_access(uuid, uuid, text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.register_client_access(uuid, uuid, text) TO authenticated;
