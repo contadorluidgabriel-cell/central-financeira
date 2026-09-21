@@ -525,7 +525,7 @@ export default function CentralFinanceiraV2() {
 
   function CompanySettings({ c }) {
     return <>
-      <PageHeader title="Cadastro da empresa" description="Dados cadastrais e de contato. O cliente escolhe o nível de controle e os modos de receitas e despesas no próprio acesso."/>
+      <PageHeader title="Cadastro da empresa" description="Dados cadastrais e de contato. O cliente escolhe o nível de controle e uma forma única de lançamento para receitas e despesas no próprio acesso."/>
       <div className={styles.settingsStack}>
         <section className={styles.settingSection}>
           <div className={styles.settingHeader}><h3>Dados da empresa</h3><p>Identificação usada na Central e na criação do acesso.</p></div>
@@ -542,7 +542,7 @@ export default function CentralFinanceiraV2() {
         <section className={styles.settingSection}>
           <div className={styles.settingHeader}><h3>Configuração financeira</h3><p>As escolhas de controle pertencem ao cliente.</p></div>
           <div className={styles.settingBody}>
-            <div className={styles.modalHint}><b>Como funciona:</b> o administrador cadastra a empresa e libera o acesso. No primeiro acesso, o cliente escolhe Controle Simples ou Básico, os modos de receitas e despesas e o mês inicial. Essas opções não são definidas neste cadastro.</div>
+            <div className={styles.modalHint}><b>Como funciona:</b> o administrador cadastra a empresa e libera o acesso. No primeiro acesso, o cliente escolhe Controle Simples ou Básico, a forma única de registro e o mês inicial. Essas opções não são definidas neste cadastro.</div>
           </div>
         </section>
       </div>
